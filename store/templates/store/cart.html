@@ -1,0 +1,461 @@
+{% extends "store/base.html" %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <h2 class="mb-4">Shopping Cart</h2>
+
+    {% if items %}
+
+        <div class="table-responsive">
+
+            <table class="table align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Subtotal</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in items %}
+
+                    <tr id="cart-row-{{ item.id }}">
+
+                        <!-- PRODUCT -->
+
+                        <td>
+
+                            <div class="d-flex align-items-center">
+
+                                {% if item.product.image %}
+
+                                <img
+                                    src="{{ item.product.image.url }}"
+                                    width="70"
+                                    height="70"
+                                    style="object-fit:cover;"
+                                    class="rounded me-3"
+                                >
+
+                                {% endif %}
+
+                                <strong>
+                                    {{ item.product.name }}
+                                </strong>
+
+                            </div>
+
+                        </td>
+
+
+                        <!-- PRICE -->
+
+                        <td>
+                            ₹{{ item.product.price }}
+                        </td>
+
+
+                        <!-- QUANTITY -->
+
+                        <td>
+
+                            <div class="d-flex align-items-center">
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary quantity-btn"
+                                    onclick="changeQuantity({{ item.id }}, -1)"
+                                >
+                                    −
+                                </button>
+
+                                <input
+                                    type="number"
+                                    id="quantity-{{ item.id }}"
+                                    value="{{ item.quantity }}"
+                                    min="1"
+                                    max="{{ item.product.inventory }}"
+                                    class="form-control text-center mx-2"
+                                    style="width:70px;"
+                                    onchange="setQuantity({{ item.id }}, this.value)"
+                                >
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary quantity-btn"
+                                    onclick="changeQuantity({{ item.id }}, 1)"
+                                >
+                                    +
+                                </button>
+
+                            </div>
+
+                            <small class="text-muted">
+                                {{ item.product.inventory }} available
+                            </small>
+
+                        </td>
+
+
+                        <!-- SUBTOTAL -->
+
+                        <td>
+
+                            <strong id="subtotal-{{ item.id }}">
+                                ₹{{ item.subtotal }}
+                            </strong>
+
+                        </td>
+
+
+                        <!-- REMOVE -->
+
+                        <td>
+
+                            <a
+                                href="{% url 'remove_from_cart' item.id %}"
+                                class="btn btn-danger btn-sm"
+                            >
+                                Remove
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <!-- CART TOTAL -->
+
+        <div class="text-end mt-4">
+
+            <h4>
+                Total:
+                ₹<span id="cart-total">{{ total }}</span>
+            </h4>
+
+            <a
+                href="{% url 'checkout' %}"
+                class="btn btn-success btn-lg mt-2"
+            >
+                Proceed to Checkout
+            </a>
+
+        </div>
+
+    {% else %}
+
+        <div class="alert alert-info">
+
+            Your cart is empty.
+
+            <a href="{% url 'products' %}">
+                Continue Shopping
+            </a>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+<!-- ============================================================
+     AUTOMATIC CART QUANTITY UPDATE
+============================================================= -->
+
+<script>
+
+function getCSRFToken() {
+
+    const csrfInput = document.querySelector(
+        '[name=csrfmiddlewaretoken]'
+    );
+
+    if (csrfInput) {
+        return csrfInput.value;
+    }
+
+    return getCookie('csrftoken');
+}
+
+
+function getCookie(name) {
+
+    let cookieValue = null;
+
+    if (document.cookie && document.cookie !== '') {
+
+        const cookies = document.cookie.split(';');
+
+        for (let cookie of cookies) {
+
+            cookie = cookie.trim();
+
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+
+                cookieValue = decodeURIComponent(
+                    cookie.substring(name.length + 1)
+                );
+
+                break;
+            }
+        }
+    }
+
+    return cookieValue;
+}
+
+
+/* ============================================================
+   PLUS / MINUS BUTTON
+============================================================ */
+
+function changeQuantity(itemId, change) {
+
+    const input = document.getElementById(
+        `quantity-${itemId}`
+    );
+
+    if (!input) {
+        return;
+    }
+
+    let quantity = parseInt(input.value) || 1;
+
+    const maxQuantity = parseInt(
+        input.getAttribute("max")
+    ) || 999999;
+
+    quantity += change;
+
+    if (quantity < 1) {
+        quantity = 1;
+    }
+
+    if (quantity > maxQuantity) {
+
+        quantity = maxQuantity;
+
+        alert(
+            `Only ${maxQuantity} item(s) available in stock.`
+        );
+    }
+
+    input.value = quantity;
+
+    updateCartQuantity(
+        itemId,
+        quantity
+    );
+}
+
+
+/* ============================================================
+   MANUAL QUANTITY INPUT
+============================================================ */
+
+function setQuantity(itemId, quantity) {
+
+    const input = document.getElementById(
+        `quantity-${itemId}`
+    );
+
+    const maxQuantity = parseInt(
+        input.getAttribute("max")
+    ) || 999999;
+
+    quantity = parseInt(quantity) || 1;
+
+    if (quantity < 1) {
+        quantity = 1;
+    }
+
+    if (quantity > maxQuantity) {
+
+        quantity = maxQuantity;
+
+        alert(
+            `Only ${maxQuantity} item(s) available in stock.`
+        );
+    }
+
+    input.value = quantity;
+
+    updateCartQuantity(
+        itemId,
+        quantity
+    );
+}
+
+
+/* ============================================================
+   AJAX UPDATE
+============================================================ */
+
+function updateCartQuantity(itemId, quantity) {
+
+    const input = document.getElementById(
+        `quantity-${itemId}`
+    );
+
+    const row = document.getElementById(
+        `cart-row-${itemId}`
+    );
+
+    const subtotal = document.getElementById(
+        `subtotal-${itemId}`
+    );
+
+    const cartTotal = document.getElementById(
+        "cart-total"
+    );
+
+    if (input) {
+        input.disabled = true;
+    }
+
+    fetch(
+        `{% url 'update_cart' 0 %}`.replace(
+            '/0/',
+            `/${itemId}/`
+        ),
+        {
+            method: "POST",
+
+            headers: {
+                "X-CSRFToken": getCSRFToken(),
+                "X-Requested-With": "XMLHttpRequest",
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+
+            body:
+                `quantity=${encodeURIComponent(quantity)}`
+        }
+    )
+
+    .then(response => {
+
+        if (!response.ok) {
+            throw new Error(
+                "Unable to update cart."
+            );
+        }
+
+        return response.json();
+
+    })
+
+    .then(data => {
+
+        if (input) {
+            input.disabled = false;
+        }
+
+
+        if (!data.success) {
+
+            alert(
+                data.message ||
+                "Unable to update cart."
+            );
+
+            return;
+        }
+
+
+        /* -----------------------------------------
+           PRODUCT DELETED
+        ----------------------------------------- */
+
+        if (data.deleted) {
+
+            if (row) {
+                row.remove();
+            }
+
+            window.location.reload();
+
+            return;
+        }
+
+
+        /* -----------------------------------------
+           UPDATE QUANTITY
+        ----------------------------------------- */
+
+        if (input) {
+
+            input.value = data.quantity;
+
+            input.setAttribute(
+                "max",
+                data.inventory
+            );
+        }
+
+
+        /* -----------------------------------------
+           UPDATE SUBTOTAL
+        ----------------------------------------- */
+
+        if (subtotal) {
+
+            subtotal.innerText =
+                "₹" +
+                Number(data.subtotal).toLocaleString(
+                    "en-IN"
+                );
+        }
+
+
+        /* -----------------------------------------
+           UPDATE CART TOTAL
+        ----------------------------------------- */
+
+        if (cartTotal) {
+
+            cartTotal.innerText =
+                Number(data.cart_total).toLocaleString(
+                    "en-IN"
+                );
+        }
+
+    })
+
+    .catch(error => {
+
+        console.error(
+            "Cart update error:",
+            error
+        );
+
+        if (input) {
+            input.disabled = false;
+        }
+
+        alert(
+            "Something went wrong while updating the cart."
+        );
+
+    });
+
+}
+
+</script>
+
+{% endblock %}

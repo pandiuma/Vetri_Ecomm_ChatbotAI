@@ -1,0 +1,897 @@
+
+{% extends "store/base.html" %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <h2 class="mb-4">
+        <i class="fas fa-shopping-bag"></i>
+        Checkout
+    </h2>
+
+    <div class="row g-4">
+
+        <!-- =========================================
+             DELIVERY + PAYMENT
+        ========================================== -->
+
+        <div class="col-md-7">
+
+            <form method="post">
+
+                {% csrf_token %}
+
+                <div class="card p-4 shadow-sm">
+
+                    <!-- =================================
+                         DELIVERY DETAILS
+                    ================================== -->
+
+                    <h4 class="mb-4">
+                        <i class="fas fa-location-dot"></i>
+                        Delivery Details
+                    </h4>
+
+                    <input
+                        type="text"
+                        name="full_name"
+                        class="form-control mb-3"
+                        placeholder="Full Name"
+                        required
+                    >
+
+                    <input
+                        type="text"
+                        name="phone"
+                        class="form-control mb-3"
+                        placeholder="Phone Number"
+                        required
+                    >
+
+                    <textarea
+                        name="address"
+                        class="form-control mb-3"
+                        placeholder="Delivery Address"
+                        rows="4"
+                        required
+                    ></textarea>
+
+                    <input
+                        type="text"
+                        name="city"
+                        class="form-control mb-3"
+                        placeholder="City"
+                        required
+                    >
+
+                    <input
+                        type="text"
+                        name="state"
+                        class="form-control mb-3"
+                        placeholder="State"
+                        required
+                    >
+
+                    <input
+                        type="text"
+                        name="pincode"
+                        class="form-control mb-3"
+                        placeholder="Pincode"
+                        required
+                    >
+
+
+                    <!-- =================================
+                         PAYMENT METHOD
+                    ================================== -->
+
+                    <h5 class="mt-3 mb-3">
+                        <i class="fas fa-credit-card"></i>
+                        Payment Method
+                    </h5>
+
+
+                    <!-- CASH ON DELIVERY -->
+
+                    <div class="payment-option">
+
+                        <div class="form-check">
+
+                            <input
+                                class="form-check-input payment-method"
+                                type="radio"
+                                name="payment_method"
+                                value="cod"
+                                id="cod"
+                                checked
+                            >
+
+                            <label
+                                class="form-check-label"
+                                for="cod"
+                            >
+                                <i class="fas fa-money-bill-wave"></i>
+                                <strong>Cash on Delivery</strong>
+
+                                <small class="d-block text-muted">
+                                    Pay when your order is delivered
+                                </small>
+
+                            </label>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- ONLINE PAYMENT -->
+
+                    <div class="payment-option mt-3">
+
+                        <div class="form-check">
+
+                            <input
+                                class="form-check-input payment-method"
+                                type="radio"
+                                name="payment_method"
+                                value="online"
+                                id="online"
+                            >
+
+                            <label
+                                class="form-check-label"
+                                for="online"
+                            >
+                                <i class="fas fa-credit-card"></i>
+                                <strong>Online Payment</strong>
+
+                                <small class="d-block text-muted">
+                                    Pay securely using Card, UPI, Net Banking or Wallet
+                                </small>
+
+                            </label>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- =================================
+                         ONLINE PAYMENT OPTIONS
+                         Hidden Initially
+                    ================================== -->
+
+                    <div
+                        id="onlinePaymentBox"
+                        class="online-payment-box mt-4"
+                        style="display:none;"
+                    >
+
+                        <h5 class="mb-3">
+                            <i class="fas fa-lock"></i>
+                            Choose Payment Option
+                        </h5>
+
+
+                        <!-- PAYMENT TYPE TABS -->
+
+                        <div class="payment-types">
+
+
+                            <!-- CARD -->
+
+                            <label class="payment-type">
+
+                                <input
+                                    type="radio"
+                                    name="online_payment_type"
+                                    value="card"
+                                    id="paymentCard"
+                                    checked
+                                >
+
+                                <span>
+                                    <i class="fas fa-credit-card"></i>
+                                    Card
+                                </span>
+
+                            </label>
+
+
+                            <!-- UPI -->
+
+                            <label class="payment-type">
+
+                                <input
+                                    type="radio"
+                                    name="online_payment_type"
+                                    value="upi"
+                                    id="paymentUPI"
+                                >
+
+                                <span>
+                                    <i class="fas fa-mobile-screen-button"></i>
+                                    UPI
+                                </span>
+
+                            </label>
+
+
+                            <!-- NET BANKING -->
+
+                            <label class="payment-type">
+
+                                <input
+                                    type="radio"
+                                    name="online_payment_type"
+                                    value="netbanking"
+                                    id="paymentNetBanking"
+                                >
+
+                                <span>
+                                    <i class="fas fa-building-columns"></i>
+                                    Net Banking
+                                </span>
+
+                            </label>
+
+
+                            <!-- WALLET -->
+
+                            <label class="payment-type">
+
+                                <input
+                                    type="radio"
+                                    name="online_payment_type"
+                                    value="wallet"
+                                    id="paymentWallet"
+                                >
+
+                                <span>
+                                    <i class="fas fa-wallet"></i>
+                                    Wallet
+                                </span>
+
+                            </label>
+
+                        </div>
+
+
+                        <!-- =================================
+                             CARD DETAILS
+                        ================================== -->
+
+                        <div
+                            id="cardPayment"
+                            class="payment-details mt-4"
+                        >
+
+                            <h6 class="mb-3">
+                                <i class="fas fa-credit-card"></i>
+                                Card Details
+                            </h6>
+
+                            <input
+                                type="text"
+                                name="card_name"
+                                class="form-control mb-3"
+                                placeholder="Cardholder Name"
+                            >
+
+                            <input
+                                type="text"
+                                name="card_number"
+                                class="form-control mb-3"
+                                placeholder="Card Number"
+                                maxlength="19"
+                            >
+
+                            <div class="row">
+
+                                <div class="col-6">
+
+                                    <input
+                                        type="text"
+                                        name="card_expiry"
+                                        class="form-control mb-3"
+                                        placeholder="MM / YY"
+                                        maxlength="5"
+                                    >
+
+                                </div>
+
+                                <div class="col-6">
+
+                                    <input
+                                        type="password"
+                                        name="card_cvv"
+                                        class="form-control mb-3"
+                                        placeholder="CVV"
+                                        maxlength="4"
+                                    >
+
+                                </div>
+
+                            </div>
+
+                            <div class="secure-payment">
+
+                                <i class="fas fa-shield-halved"></i>
+
+                                Your payment information is protected
+                                by secure payment processing.
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- =================================
+                             UPI DETAILS
+                        ================================== -->
+
+                        <div
+                            id="upiPayment"
+                            class="payment-details mt-4"
+                            style="display:none;"
+                        >
+
+                            <h6 class="mb-3">
+                                <i class="fas fa-mobile-screen-button"></i>
+                                UPI Payment
+                            </h6>
+
+                            <input
+                                type="text"
+                                name="upi_id"
+                                class="form-control mb-3"
+                                placeholder="Enter UPI ID (example@upi)"
+                            >
+
+                            <div class="upi-apps">
+
+                                <div class="upi-app">
+                                    <i class="fas fa-mobile"></i>
+                                    <span>UPI</span>
+                                </div>
+
+                                <div class="upi-app">
+                                    <i class="fas fa-qrcode"></i>
+                                    <span>Scan & Pay</span>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- =================================
+                             NET BANKING
+                        ================================== -->
+
+                        <div
+                            id="netbankingPayment"
+                            class="payment-details mt-4"
+                            style="display:none;"
+                        >
+
+                            <h6 class="mb-3">
+                                <i class="fas fa-building-columns"></i>
+                                Select Your Bank
+                            </h6>
+
+                            <select
+                                name="bank"
+                                class="form-select"
+                            >
+
+                                <option value="">
+                                    Select Bank
+                                </option>
+
+                                <option value="sbi">
+                                    State Bank of India
+                                </option>
+
+                                <option value="hdfc">
+                                    HDFC Bank
+                                </option>
+
+                                <option value="icici">
+                                    ICICI Bank
+                                </option>
+
+                                <option value="axis">
+                                    Axis Bank
+                                </option>
+
+                                <option value="kotak">
+                                    Kotak Mahindra Bank
+                                </option>
+
+                                <option value="other">
+                                    Other Bank
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- =================================
+                             WALLET
+                        ================================== -->
+
+                        <div
+                            id="walletPayment"
+                            class="payment-details mt-4"
+                            style="display:none;"
+                        >
+
+                            <h6 class="mb-3">
+                                <i class="fas fa-wallet"></i>
+                                Select Wallet
+                            </h6>
+
+                            <select
+                                name="wallet"
+                                class="form-select"
+                            >
+
+                                <option value="">
+                                    Select Wallet
+                                </option>
+
+                                <option value="paytm">
+                                    Paytm
+                                </option>
+
+                                <option value="phonepe">
+                                    PhonePe
+                                </option>
+
+                                <option value="amazonpay">
+                                    Amazon Pay
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- =================================
+                         PLACE ORDER
+                    ================================== -->
+
+                    <button
+                        type="submit"
+                        class="btn btn-success btn-lg w-100 mt-4"
+                    >
+
+                        <i class="fas fa-lock"></i>
+
+                        Place Order
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+
+        <!-- =========================================
+             ORDER SUMMARY
+        ========================================== -->
+
+        <div class="col-md-5">
+
+            <div class="card p-4 shadow-sm">
+
+                <h4 class="mb-4">
+
+                    <i class="fas fa-receipt"></i>
+
+                    Order Summary
+
+                </h4>
+
+
+                {% for item in items %}
+
+                <div class="d-flex justify-content-between mb-3">
+
+                    <span>
+
+                        {{ item.product.name }}
+
+                        × {{ item.quantity }}
+
+                    </span>
+
+                    <span>
+
+                        ₹{{ item.subtotal }}
+
+                    </span>
+
+                </div>
+
+                {% endfor %}
+
+
+                <hr>
+
+
+                <h4 class="d-flex justify-content-between">
+
+                    <span>
+                        Total
+                    </span>
+
+                    <span>
+                        ₹{{ total }}
+                    </span>
+
+                </h4>
+
+
+                <div class="secure-payment mt-4">
+
+                    <i class="fas fa-shield-halved"></i>
+
+                    Secure checkout
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================
+     PAYMENT JAVASCRIPT
+========================================== -->
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const cod = document.getElementById("cod");
+    const online = document.getElementById("online");
+
+    const onlinePaymentBox =
+        document.getElementById("onlinePaymentBox");
+
+    const paymentCard =
+        document.getElementById("cardPayment");
+
+    const paymentUPI =
+        document.getElementById("upiPayment");
+
+    const paymentNetBanking =
+        document.getElementById("netbankingPayment");
+
+    const paymentWallet =
+        document.getElementById("walletPayment");
+
+
+    /* =====================================
+       COD / ONLINE
+    ===================================== */
+
+    function updatePaymentMethod() {
+
+        if (online.checked) {
+
+            onlinePaymentBox.style.display = "block";
+
+        } else {
+
+            onlinePaymentBox.style.display = "none";
+
+        }
+
+    }
+
+
+    cod.addEventListener(
+        "change",
+        updatePaymentMethod
+    );
+
+    online.addEventListener(
+        "change",
+        updatePaymentMethod
+    );
+
+
+    /* =====================================
+       ONLINE PAYMENT TYPE
+    ===================================== */
+
+    const paymentTypes =
+        document.querySelectorAll(
+            'input[name="online_payment_type"]'
+        );
+
+
+    paymentTypes.forEach(function (radio) {
+
+        radio.addEventListener("change", function () {
+
+            paymentCard.style.display = "none";
+
+            paymentUPI.style.display = "none";
+
+            paymentNetBanking.style.display = "none";
+
+            paymentWallet.style.display = "none";
+
+
+            if (this.value === "card") {
+
+                paymentCard.style.display = "block";
+
+            }
+
+            else if (this.value === "upi") {
+
+                paymentUPI.style.display = "block";
+
+            }
+
+            else if (this.value === "netbanking") {
+
+                paymentNetBanking.style.display = "block";
+
+            }
+
+            else if (this.value === "wallet") {
+
+                paymentWallet.style.display = "block";
+
+            }
+
+        });
+
+    });
+
+});
+
+</script>
+
+
+<style>
+
+/* =========================================
+   PAYMENT OPTION
+========================================= */
+
+.payment-option {
+
+    border: 1px solid #dee2e6;
+
+    border-radius: 10px;
+
+    padding: 14px;
+
+    transition: 0.2s;
+
+}
+
+.payment-option:hover {
+
+    border-color: #198754;
+
+    background: #f8fff9;
+
+}
+
+
+/* =========================================
+   ONLINE PAYMENT BOX
+========================================= */
+
+.online-payment-box {
+
+    border: 1px solid #dee2e6;
+
+    border-radius: 12px;
+
+    padding: 20px;
+
+    background: #fafafa;
+
+}
+
+
+/* =========================================
+   PAYMENT TYPES
+========================================= */
+
+.payment-types {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 10px;
+
+}
+
+
+.payment-type {
+
+    cursor: pointer;
+
+}
+
+
+.payment-type input {
+
+    display: none;
+
+}
+
+
+.payment-type span {
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    text-align: center;
+
+    min-height: 80px;
+
+    border: 1px solid #dee2e6;
+
+    border-radius: 10px;
+
+    background: #ffffff;
+
+    padding: 10px;
+
+    transition: 0.2s;
+
+}
+
+
+.payment-type span i {
+
+    font-size: 20px;
+
+    margin-bottom: 7px;
+
+}
+
+
+.payment-type input:checked + span {
+
+    border-color: #198754;
+
+    background: #eaf8f0;
+
+    color: #198754;
+
+    box-shadow:
+        0 2px 8px rgba(25, 135, 84, 0.15);
+
+}
+
+
+/* =========================================
+   PAYMENT DETAILS
+========================================= */
+
+.payment-details {
+
+    background: #ffffff;
+
+    border: 1px solid #e1e1e1;
+
+    border-radius: 10px;
+
+    padding: 18px;
+
+}
+
+
+/* =========================================
+   SECURE PAYMENT
+========================================= */
+
+.secure-payment {
+
+    font-size: 13px;
+
+    color: #198754;
+
+    background: #f0fff6;
+
+    border-radius: 8px;
+
+    padding: 10px;
+
+}
+
+
+.secure-payment i {
+
+    margin-right: 6px;
+
+}
+
+
+/* =========================================
+   UPI APPS
+========================================= */
+
+.upi-apps {
+
+    display: flex;
+
+    gap: 10px;
+
+}
+
+
+.upi-app {
+
+    flex: 1;
+
+    border: 1px solid #dee2e6;
+
+    border-radius: 8px;
+
+    padding: 15px;
+
+    text-align: center;
+
+}
+
+
+.upi-app i {
+
+    display: block;
+
+    font-size: 22px;
+
+    margin-bottom: 5px;
+
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    .payment-types {
+
+        grid-template-columns:
+            repeat(2, 1fr);
+
+    }
+
+}
+
+</style>
+
+{% endblock %}
+

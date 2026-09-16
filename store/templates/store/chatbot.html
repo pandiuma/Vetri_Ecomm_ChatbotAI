@@ -1,0 +1,1757 @@
+{% extends 'store/base.html' %}
+
+{% load static %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'store/css/chatbot.css' %}">
+
+<div class="container chatbot-container">
+
+    <div class="chat-box">
+
+        <!-- ==============================
+             CHAT HEADER
+        =============================== -->
+
+        <div class="chat-header">
+
+            <h1>Vetri AI Assistant</h1>
+
+            <p>
+                Ask me anything about your products,
+                catalog, recommendations, SEO,
+                product descriptions, orders and more.
+            </p>
+
+        </div>
+
+
+        <!-- ==============================
+             CHAT MESSAGES
+        =============================== -->
+
+        <div id="chatMessages" class="chat-messages"></div>
+
+
+        <!-- ==============================
+             CHAT INPUT
+        =============================== -->
+
+        <form id="chatForm">
+
+            <div class="input-group chat-input-area">
+
+                <input type="text" id="chatQuestion" class="form-control" placeholder="Ask Vetri AI..."
+                    autocomplete="off" required>
+
+                <button type="submit" id="chatSendButton" class="btn btn-primary">
+                    Send
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const chatForm =
+            document.getElementById("chatForm");
+
+        const chatQuestion =
+            document.getElementById("chatQuestion");
+
+        const chatMessages =
+            document.getElementById("chatMessages");
+
+        const chatSendButton =
+            document.getElementById("chatSendButton");
+
+
+        /* =========================================
+           DJANGO CHATBOT API
+        ========================================= */
+
+        const chatbotApiUrl =
+            "{% url 'chatbot_api' %}";
+
+
+        /* =========================================
+           GET CSRF TOKEN
+        ========================================= */
+
+        function getCookie(name) {
+
+            let cookieValue = null;
+
+            if (
+                document.cookie &&
+                document.cookie !== ""
+            ) {
+
+                const cookies =
+                    document.cookie.split(";");
+
+                for (
+                    let i = 0;
+                    i < cookies.length;
+                    i++
+                ) {
+
+                    const cookie =
+                        cookies[i].trim();
+
+                    if (
+                        cookie.substring(
+                            0,
+                            name.length + 1
+                        ) === name + "="
+                    ) {
+
+                        cookieValue =
+                            decodeURIComponent(
+                                cookie.substring(
+                                    name.length + 1
+                                )
+                            );
+
+                        break;
+                    }
+                }
+            }
+
+            return cookieValue;
+        }
+
+
+        const csrftoken =
+            getCookie("csrftoken");
+
+
+        /* =========================================
+           ESCAPE HTML
+        ========================================= */
+
+        function escapeHtml(value) {
+
+            if (
+                value === null ||
+                value === undefined
+            ) {
+                return "";
+            }
+
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+
+        /* =========================================
+           FORMAT AI TEXT
+        ========================================= */
+
+        function formatAIText(text) {
+
+            if (!text) {
+                return "";
+            }
+
+            let safe =
+                escapeHtml(text);
+
+
+            /* Bold */
+
+            safe =
+                safe.replace(
+                    /\*\*(.*?)\*\*/g,
+                    "<strong>$1</strong>"
+                );
+
+
+            /* Headings */
+
+            safe =
+                safe.replace(
+                    /^### (.*)$/gm,
+                    "<h4>$1</h4>"
+                );
+
+            safe =
+                safe.replace(
+                    /^## (.*)$/gm,
+                    "<h3>$1</h3>"
+                );
+
+            safe =
+                safe.replace(
+                    /^# (.*)$/gm,
+                    "<h2>$1</h2>"
+                );
+
+
+            /* Horizontal line */
+
+            safe =
+                safe.replace(
+                    /^---$/gm,
+                    "<hr>"
+                );
+
+
+            /* Bullet points */
+
+            safe =
+                safe.replace(
+                    /^\s*[-*]\s+(.*)$/gm,
+                    "<li>$1</li>"
+                );
+
+
+            safe =
+                safe.replace(
+                    /(<li>.*?<\/li>)/gs,
+                    "<ul>$1</ul>"
+                );
+
+
+            /* New lines */
+
+            safe =
+                safe.replace(
+                    /\n/g,
+                    "<br>"
+                );
+
+            return safe;
+        }
+
+
+        /* =========================================
+           SCROLL TO BOTTOM
+        ========================================= */
+
+        function scrollToBottom() {
+
+            chatMessages.scrollTop =
+                chatMessages.scrollHeight;
+        }
+
+
+        /* =========================================
+           ADD USER MESSAGE
+        ========================================= */
+
+        function addUserMessage(message) {
+
+            const messageDiv =
+                document.createElement("div");
+
+            messageDiv.className =
+                "chat-message user-message";
+
+
+            const contentDiv =
+                document.createElement("div");
+
+            contentDiv.className =
+                "message-content";
+
+
+            contentDiv.textContent =
+                message;
+
+
+            messageDiv.appendChild(
+                contentDiv
+            );
+
+            chatMessages.appendChild(
+                messageDiv
+            );
+
+            scrollToBottom();
+        }
+
+
+        /* =========================================
+           ADD AI MESSAGE
+        ========================================= */
+
+        function addAIMessage(message) {
+
+            const messageDiv =
+                document.createElement("div");
+
+            messageDiv.className =
+                "chat-message ai-message";
+
+
+            const contentDiv =
+                document.createElement("div");
+
+            contentDiv.className =
+                "message-content ai-text";
+
+
+            contentDiv.innerHTML =
+                formatAIText(message);
+
+
+            messageDiv.appendChild(
+                contentDiv
+            );
+
+            chatMessages.appendChild(
+                messageDiv
+            );
+
+            scrollToBottom();
+        }
+
+
+        /* =========================================
+           PRODUCT CARDS
+    
+           This function displays the REAL product
+           image supplied by Django.
+    
+        ========================================= */
+
+        function addProductCards(products) {
+
+            if (
+                !products ||
+                !Array.isArray(products) ||
+                products.length === 0
+            ) {
+                return;
+            }
+
+
+            const messageDiv =
+                document.createElement("div");
+
+            messageDiv.className =
+                "chat-message ai-message";
+
+
+            const contentDiv =
+                document.createElement("div");
+
+            contentDiv.className =
+                "message-content";
+
+
+            const title =
+                document.createElement("div");
+
+            title.className =
+                "products-title";
+
+            title.textContent =
+                "🛍️ Product Details";
+
+
+            contentDiv.appendChild(
+                title
+            );
+
+
+            const productsContainer =
+                document.createElement("div");
+
+            productsContainer.className =
+                "product-results";
+
+
+            products.forEach(function (product) {
+
+                const card =
+                    document.createElement("div");
+
+                card.className =
+                    "product-card";
+
+
+                /* =================================
+                   IMAGE
+                ================================= */
+
+                const imageContainer =
+                    document.createElement("div");
+
+                imageContainer.className =
+                    "product-image-container";
+
+
+                /*
+                 * Support both:
+                 *
+                 * image
+                 * image_url
+                 * chatbot_image_url
+                 *
+                 */
+
+                let imageUrl =
+                    product.image ||
+                    product.image_url ||
+                    product.chatbot_image_url ||
+                    "";
+
+
+                /*
+                 * Remove accidental spaces.
+                 */
+
+                if (imageUrl) {
+                    imageUrl =
+                        String(imageUrl).trim();
+                }
+
+
+                if (imageUrl) {
+
+                    const image =
+                        document.createElement("img");
+
+                    image.className =
+                        "product-image";
+
+
+                    /*
+                     * Django normally returns:
+                     *
+                     * /media/products/xxx.jpg
+                     *
+                     * which can be used directly.
+                     */
+
+                    image.src =
+                        imageUrl;
+
+
+                    image.alt =
+                        product.name ||
+                        "Product";
+
+
+                    image.loading =
+                        "lazy";
+
+
+                    image.onerror =
+                        function () {
+
+                            console.error(
+                                "Vetri AI product image failed:",
+                                imageUrl
+                            );
+
+
+                            image.style.display =
+                                "none";
+
+
+                            const noImage =
+                                document.createElement("div");
+
+                            noImage.className =
+                                "product-no-image";
+
+                            noImage.textContent =
+                                "Image unavailable";
+
+
+                            imageContainer.appendChild(
+                                noImage
+                            );
+                        };
+
+
+                    imageContainer.appendChild(
+                        image
+                    );
+
+                }
+                else {
+
+                    const noImage =
+                        document.createElement("div");
+
+                    noImage.className =
+                        "product-no-image";
+
+                    noImage.textContent =
+                        "No image available";
+
+
+                    imageContainer.appendChild(
+                        noImage
+                    );
+                }
+
+
+                card.appendChild(
+                    imageContainer
+                );
+
+
+                /* =================================
+                   PRODUCT INFORMATION
+                ================================= */
+
+                const info =
+                    document.createElement("div");
+
+                info.className =
+                    "product-info";
+
+
+                /* NAME */
+
+                const name =
+                    document.createElement("div");
+
+                name.className =
+                    "product-name";
+
+                name.textContent =
+                    product.name ||
+                    "Product";
+
+
+                info.appendChild(
+                    name
+                );
+
+
+                /* BRAND */
+
+                if (product.brand) {
+
+                    const brand =
+                        document.createElement("div");
+
+                    brand.className =
+                        "product-brand";
+
+                    brand.textContent =
+                        "Brand: " +
+                        product.brand;
+
+
+                    info.appendChild(
+                        brand
+                    );
+                }
+
+
+                /* PRICE */
+
+                if (
+                    product.price !== null &&
+                    product.price !== undefined &&
+                    product.price !== ""
+                ) {
+
+                    const price =
+                        document.createElement("div");
+
+                    price.className =
+                        "product-price";
+
+
+                    const numericPrice =
+                        Number(product.price);
+
+
+                    if (
+                        !Number.isNaN(
+                            numericPrice
+                        )
+                    ) {
+
+                        price.textContent =
+                            "₹" +
+                            numericPrice.toLocaleString(
+                                "en-IN",
+                                {
+                                    minimumFractionDigits: 2
+                                }
+                            );
+
+                    }
+                    else {
+
+                        price.textContent =
+                            "₹" +
+                            product.price;
+                    }
+
+
+                    info.appendChild(
+                        price
+                    );
+                }
+
+
+                /* STOCK */
+
+                if (
+                    product.inventory !== undefined &&
+                    product.inventory !== null
+                ) {
+
+                    const stock =
+                        document.createElement("div");
+
+                    stock.className =
+                        "product-stock";
+
+
+                    if (
+                        Number(product.inventory) > 0
+                    ) {
+
+                        stock.classList.add(
+                            "stock-yes"
+                        );
+
+                        stock.textContent =
+                            "✅ In Stock (" +
+                            product.inventory +
+                            " available)";
+
+                    }
+                    else {
+
+                        stock.classList.add(
+                            "stock-no"
+                        );
+
+                        stock.textContent =
+                            "❌ Out of Stock";
+                    }
+
+
+                    info.appendChild(
+                        stock
+                    );
+                }
+
+
+                /* =================================
+                   DETAILS
+                ================================= */
+
+                const details =
+                    document.createElement("div");
+
+                details.className =
+                    "product-details";
+
+
+                if (product.category) {
+
+                    details.innerHTML +=
+                        "<strong>Category:</strong> " +
+                        escapeHtml(
+                            product.category
+                        ) +
+                        "<br>";
+                }
+
+
+                if (product.subcategory) {
+
+                    details.innerHTML +=
+                        "<strong>Subcategory:</strong> " +
+                        escapeHtml(
+                            product.subcategory
+                        ) +
+                        "<br>";
+                }
+
+
+                if (product.style) {
+
+                    details.innerHTML +=
+                        "<strong>Style:</strong> " +
+                        escapeHtml(
+                            product.style
+                        ) +
+                        "<br>";
+                }
+
+
+                if (product.colors) {
+
+                    let colors =
+                        product.colors;
+
+
+                    if (Array.isArray(colors)) {
+
+                        colors =
+                            colors.join(", ");
+                    }
+
+
+                    details.innerHTML +=
+                        "<strong>Color:</strong> " +
+                        escapeHtml(
+                            colors
+                        ) +
+                        "<br>";
+                }
+
+
+                if (product.material) {
+
+                    details.innerHTML +=
+                        "<strong>Material:</strong> " +
+                        escapeHtml(
+                            product.material
+                        ) +
+                        "<br>";
+                }
+
+
+                if (product.use_case) {
+
+                    details.innerHTML +=
+                        "<strong>Best For:</strong> " +
+                        escapeHtml(
+                            product.use_case
+                        ) +
+                        "<br>";
+                }
+
+
+                if (product.description) {
+
+                    details.innerHTML +=
+                        "<strong>Description:</strong> " +
+                        escapeHtml(
+                            product.description
+                        ) +
+                        "<br>";
+                }
+
+
+                info.appendChild(
+                    details
+                );
+
+
+                /* =================================
+                   VIEW PRODUCT
+                ================================= */
+
+                const productId =
+                    product.id;
+
+                if (productId && Number(product.inventory) > 0) {
+
+                    const cartButton =
+                        document.createElement("a");
+
+                    cartButton.href =
+                        `/cart/add/${productId}/`;
+
+                    cartButton.className =
+                        "product-button chatbot-add-cart-btn";
+
+                    cartButton.innerHTML =
+                        "🛒 Add to Cart";
+
+                    cartButton.target =
+                        "_self";
+
+                    info.appendChild(
+                        cartButton
+                    );
+                }
+
+                card.appendChild(
+                    info
+                );
+
+
+                productsContainer.appendChild(
+                    card
+                );
+
+            });
+
+
+            contentDiv.appendChild(
+                productsContainer
+            );
+
+
+            messageDiv.appendChild(
+                contentDiv
+            );
+
+
+            chatMessages.appendChild(
+                messageDiv
+            );
+
+
+            scrollToBottom();
+        }
+
+        function addComparison(products) {
+
+            if (!products || products.length < 2) {
+                return;
+            }
+
+            const container = document.createElement("div");
+
+            container.className = "chatbot-comparison";
+
+            let html = `
+        <div class="comparison-title">
+            ⚖️ Product Comparison
+        </div>
+
+        <div class="comparison-grid">
+    `;
+
+            products.forEach(function (product) {
+
+                const productId = product.id || "";
+                const inventory = Number(product.inventory || 0);
+
+                const cartUrl =
+                    `/cart/add/${productId}/`;
+
+                html += `
+            <div class="comparison-card">
+
+                <div class="comparison-product-name">
+                    👜 ${product.name || "Product"}
+                </div>
+
+                <div class="comparison-row">
+                    <span>🏷️ Brand</span>
+                    <strong>${product.brand || "-"}</strong>
+                </div>
+
+                <div class="comparison-row">
+                    <span>💰 Price</span>
+                    <strong>₹${Number(product.price || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2
+                })}</strong>
+                </div>
+
+                <div class="comparison-row">
+                    <span>📦 Availability</span>
+                    <strong>
+                        ${inventory > 0
+                        ? `✅ In Stock (${inventory} available)`
+                        : `❌ Out of Stock`
+                    }
+                    </strong>
+                </div>
+
+                <div class="comparison-row">
+                    <span>📂 Category</span>
+                    <strong>${product.category || "-"}</strong>
+                </div>
+
+                <div class="comparison-row">
+                    <span>📁 Subcategory</span>
+                    <strong>${product.subcategory || "-"}</strong>
+                </div>
+
+                <div class="comparison-row">
+                    <span>📝 Description</span>
+                    <strong>${product.description || "-"}</strong>
+                </div>
+
+                ${productId && inventory > 0
+                        ? `
+                        <a
+                            href="${cartUrl}"
+                            class="comparison-cart-btn"
+                        >
+                            🛒 Add to Cart
+                        </a>
+                    `
+                        : `
+                        <button
+                            class="comparison-cart-btn"
+                            disabled
+                        >
+                            ❌ Out of Stock
+                        </button>
+                    `
+                    }
+
+            </div>
+        `;
+            });
+
+            html += `
+        </div>
+    `;
+
+            container.innerHTML = html;
+
+            const chatMessages =
+                document.querySelector(".chat-messages");
+
+            if (chatMessages) {
+                chatMessages.appendChild(container);
+                chatMessages.scrollTop =
+                    chatMessages.scrollHeight;
+            }
+        }
+
+
+        /* =========================================
+           AI RECOMMENDATION
+        ========================================= */
+
+        function addRecommendation(data) {
+
+            if (
+                !data.winner &&
+                !data.recommendation
+            ) {
+                return;
+            }
+
+
+            const messageDiv =
+                document.createElement("div");
+
+            messageDiv.className =
+                "chat-message ai-message";
+
+
+            const contentDiv =
+                document.createElement("div");
+
+            contentDiv.className =
+                "message-content";
+
+
+            const recommendation =
+                document.createElement("div");
+
+            recommendation.className =
+                "ai-recommendation";
+
+
+            const title =
+                document.createElement("div");
+
+            title.className =
+                "recommendation-title";
+
+            title.textContent =
+                "🏆 Better Choice";
+
+
+            recommendation.appendChild(
+                title
+            );
+
+
+            if (data.winner) { const winner = document.createElement("div"); winner.className = "recommendation-winner"; winner.textContent = data.winner.name || "Product"; recommendation.appendChild(winner); }
+
+
+            if (data.recommendation) {
+
+                const reason =
+                    document.createElement("div");
+
+                reason.className =
+                    "recommendation-reason";
+
+                reason.innerHTML =
+                    formatAIText(
+                        data.recommendation
+                    );
+
+
+                recommendation.appendChild(
+                    reason
+                );
+            }
+
+
+            contentDiv.appendChild(
+                recommendation
+            );
+
+
+            messageDiv.appendChild(
+                contentDiv
+            );
+
+
+            chatMessages.appendChild(
+                messageDiv
+            );
+
+
+            scrollToBottom();
+        }
+
+
+        /* =========================================
+           DISPLAY AI RESPONSE
+    
+           IMPORTANT FIX:
+           ai_services.py can return product
+           information as JSON INSIDE data.answer.
+    
+           This function now detects that JSON
+           and sends the products to addProductCards().
+        ========================================= */
+
+        /* =========================================
+       DISPLAY AI RESPONSE
+       FIXED:
+       If Django also returns structured products,
+       remove product Description/Image lines from
+       the normal AI answer so the product card is
+       displayed only once.
+    ========================================= */
+        function displayAIResponse(data) {
+
+            if (!data) {
+                addAIMessage("Sorry, Vetri AI did not return a response.");
+                return;
+            }
+
+            let answer = data.answer || "";
+
+            /*
+             * ==========================================================
+             * HANDLE STRUCTURED JSON RESPONSE
+             * ==========================================================
+             */
+
+            if (typeof answer === "string") {
+
+                let trimmedAnswer = answer.trim();
+
+                if (trimmedAnswer.startsWith("{")) {
+
+                    try {
+
+                        const parsedAnswer = JSON.parse(trimmedAnswer);
+
+                        /*
+                         * ==================================================
+                         * PRODUCT COMPARISON
+                         * Only comparison requests should use comparison UI
+                         * ==================================================
+                         */
+
+                        if (
+                            parsedAnswer.type === "product_results" ||
+                            parsedAnswer.type === "comparison" ||
+                            parsedAnswer.type === "product_comparison"
+                        ) {
+
+                            if (
+                                Array.isArray(data.products) &&
+                                data.products.length >= 2
+                            ) {
+
+                                addComparison(data.products);
+
+                            }
+                            else if (parsedAnswer.message) {
+
+                                addAIMessage(parsedAnswer.message);
+                            }
+
+                            return;
+                        }
+
+
+                        /*
+                         * ==================================================
+                         * SINGLE PRODUCT
+                         * ==================================================
+                         */
+
+                        if (
+                            parsedAnswer.type === "product_detail"
+                        ) {
+
+                            if (
+                                Array.isArray(data.products) &&
+                                data.products.length > 0
+                            ) {
+
+                                addProductCards(data.products);
+
+                            }
+                            else if (parsedAnswer.message) {
+
+                                addAIMessage(parsedAnswer.message);
+                            }
+
+                            return;
+                        }
+
+
+                        /*
+                         * ==================================================
+                         * AVAILABLE PRODUCTS / PRODUCT CATALOG
+                         * ==================================================
+                         */
+
+                        if (
+                            parsedAnswer.type === "product_catalog"
+                        ) {
+
+                            /*
+                             * Show normal product cards.
+                             * Do NOT use comparison.
+                             */
+
+                            if (
+                                Array.isArray(data.products) &&
+                                data.products.length > 0
+                            ) {
+
+                                addProductCards(data.products);
+
+                            }
+                            else if (parsedAnswer.message) {
+
+                                addAIMessage(parsedAnswer.message);
+                            }
+
+                            return;
+                        }
+
+                    }
+                    catch (error) {
+
+                        console.log(
+                            "Structured AI response could not be parsed."
+                        );
+                    }
+                }
+            }
+
+
+            /*
+             * ==========================================================
+             * NORMAL AI TEXT
+             * ==========================================================
+             */
+
+            if (
+                typeof answer === "string" &&
+                answer.trim() !== "" &&
+                !answer.trim().startsWith("{") &&
+                !answer.trim().startsWith("[")
+            ) {
+
+                addAIMessage(answer);
+            }
+
+
+            /*
+             * ==========================================================
+             * PRODUCT DISPLAY
+             * ==========================================================
+             *
+             * IMPORTANT:
+             * Do NOT automatically make every multiple-product
+             * response a comparison.
+             * ==========================================================
+             */
+
+            if (
+                Array.isArray(data.products) &&
+                data.products.length > 0
+            ) {
+
+                /*
+                 * If backend explicitly says comparison,
+                 * use comparison UI.
+                 */
+
+                if (
+                    data.type === "product_results" ||
+                    data.type === "comparison" ||
+                    data.type === "product_comparison"
+                ) {
+
+                    addComparison(data.products);
+
+                }
+                else {
+
+                    /*
+                     * Available products / catalog / search results
+                     * use normal product cards.
+                     */
+
+                    addProductCards(data.products);
+                }
+            }
+
+
+            /*
+             * ==========================================================
+             * RECOMMENDATION
+             * ==========================================================
+             */
+
+            if (
+                data.winner ||
+                data.recommendation
+            ) {
+
+                addRecommendation(data);
+            }
+
+
+            /*
+             * ==========================================================
+             * FALLBACK
+             * ==========================================================
+             */
+
+            if (
+                (!answer || answer.trim() === "") &&
+                (!Array.isArray(data.products) ||
+                    data.products.length === 0) &&
+                !data.winner &&
+                !data.recommendation
+            ) {
+
+                addAIMessage(
+                    "Sorry, Vetri AI did not return an answer."
+                );
+            }
+        }
+
+
+        /* =========================================
+           LOADING
+        ========================================= */
+
+        function showLoading() {
+
+            const loadingDiv =
+                document.createElement("div");
+
+            loadingDiv.id =
+                "aiLoading";
+
+            loadingDiv.className =
+                "chat-message ai-message";
+
+
+            const contentDiv =
+                document.createElement("div");
+
+            contentDiv.className =
+                "message-content";
+
+
+            contentDiv.innerHTML = `
+            <span>Vetri AI is thinking</span>
+            <span class="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </span>
+        `;
+
+
+            loadingDiv.appendChild(
+                contentDiv
+            );
+
+
+            chatMessages.appendChild(
+                loadingDiv
+            );
+
+
+            scrollToBottom();
+        }
+
+        function renderProducts(products) {
+
+            if (!products || products.length === 0) {
+                return "";
+            }
+
+            let html = `
+            <div class="chatbot-products">
+
+                <h4 class="mb-3">
+                    🛍️ Product Details
+                </h4>
+        `;
+
+            products.forEach(function (product) {
+
+                const productId = product.id;
+
+                const productName =
+                    product.name || "Product";
+
+                const brand =
+                    product.brand || "";
+
+                const price =
+                    product.price || 0;
+
+                const inventory =
+                    parseInt(product.inventory || 0);
+
+                const category =
+                    product.category || "";
+
+                const subcategory =
+                    product.subcategory || "";
+
+                const description =
+                    product.description || "";
+
+                const image =
+                    product.image || "";
+
+
+                // =============================================
+                // ADD TO CART URL
+                // =============================================
+
+                const addToCartUrl =
+                    `/cart/add/${productId}/`;
+
+
+                // =============================================
+                // PRODUCT CARD
+                // =============================================
+
+                html += `
+
+                <div class="chatbot-product-card">
+
+                    ${image
+                        ? `
+                            <div class="chatbot-product-image">
+
+                                <img
+                                    src="${image}"
+                                    alt="${productName}"
+                                >
+
+                            </div>
+                        `
+                        : ""
+                    }
+
+
+                    <div class="chatbot-product-info">
+
+                        <h5>
+                            ${productName}
+                        </h5>
+
+
+                        ${brand
+                        ? `
+                                <p>
+                                    <strong>Brand:</strong>
+                                    ${brand}
+                                </p>
+                            `
+                        : ""
+                    }
+
+
+                        <p class="chatbot-product-price">
+
+                            <strong>
+                                ₹${Number(price).toLocaleString(
+                        "en-IN",
+                        {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        }
+                    )}
+                            </strong>
+
+                        </p>
+
+
+                        ${inventory > 0
+                        ? `
+                                <p class="text-success">
+
+                                    <strong>
+                                        ✅ In Stock
+                                    </strong>
+
+                                    (${inventory} available)
+
+                                </p>
+                            `
+                        : `
+                                <p class="text-danger">
+
+                                    <strong>
+                                        ❌ Out of Stock
+                                    </strong>
+
+                                </p>
+                            `
+                    }
+
+
+                        ${category
+                        ? `
+                                <p>
+                                    <strong>Category:</strong>
+                                    ${category}
+                                </p>
+                            `
+                        : ""
+                    }
+
+
+                        ${subcategory
+                        ? `
+                                <p>
+                                    <strong>Subcategory:</strong>
+                                    ${subcategory}
+                                </p>
+                            `
+                        : ""
+                    }
+
+
+                        ${description
+                        ? `
+                                <p>
+
+                                    <strong>
+                                        Description:
+                                    </strong>
+
+                                    ${description}
+
+                                </p>
+                            `
+                        : ""
+                    }
+
+
+                        <!-- =================================
+                             ADD TO CART
+                        ================================== -->
+
+                        <div class="chatbot-product-actions">
+
+                            ${inventory > 0
+                        ? `
+                                    <a
+                                        href="${addToCartUrl}"
+                                        class="btn btn-success chatbot-add-cart-btn"
+                                    >
+                                        🛒 Add to Cart
+                                    </a>
+                                `
+                        : `
+                                    <button
+                                        class="btn btn-secondary"
+                                        disabled
+                                    >
+                                        ❌ Out of Stock
+                                    </button>
+                                `
+                    }
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            `;
+            });
+
+
+            html += `
+            </div>
+        `;
+
+            return html;
+        }
+
+
+        /* =========================================
+           REMOVE LOADING
+        ========================================= */
+
+        function removeLoading() {
+
+            const loading =
+                document.getElementById(
+                    "aiLoading"
+                );
+
+
+            if (loading) {
+                loading.remove();
+            }
+        }
+
+
+        /* =========================================
+           SEND QUESTION
+        ========================================= */
+
+        chatForm.addEventListener(
+            "submit",
+            async function (event) {
+
+                event.preventDefault();
+
+
+                const question =
+                    chatQuestion.value.trim();
+
+
+                if (!question) {
+                    return;
+                }
+
+
+                /* USER MESSAGE */
+
+                addUserMessage(
+                    question
+                );
+
+
+                /* CLEAR INPUT */
+
+                chatQuestion.value =
+                    "";
+
+
+                /* DISABLE SEND */
+
+                chatSendButton.disabled =
+                    true;
+
+                chatSendButton.textContent =
+                    "Sending...";
+
+
+                /* LOADING */
+
+                showLoading();
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            chatbotApiUrl,
+                            {
+                                method: "POST",
+
+                                headers: {
+
+                                    "Content-Type":
+                                        "application/json",
+
+                                    "X-CSRFToken":
+                                        csrftoken,
+
+                                    "X-Requested-With":
+                                        "XMLHttpRequest"
+                                },
+
+                                body:
+                                    JSON.stringify({
+                                        question:
+                                            question
+                                    })
+                            }
+                        );
+
+
+                    let data = null;
+
+
+                    try {
+
+                        data =
+                            await response.json();
+
+                    }
+                    catch (jsonError) {
+
+                        console.error(
+                            "Invalid JSON response:",
+                            jsonError
+                        );
+                    }
+
+
+                    removeLoading();
+
+
+                    /* HTTP ERROR */
+
+                    if (!response.ok) {
+
+                        console.error(
+                            "Chatbot HTTP error:",
+                            data
+                        );
+
+
+                        addAIMessage(
+                            (
+                                data &&
+                                data.error
+                            )
+                            ||
+                            "Vetri AI could not process your request."
+                        );
+
+
+                        return;
+                    }
+
+
+                    /* APPLICATION ERROR */
+
+                    if (
+                        data &&
+                        data.success === false
+                    ) {
+
+                        console.error(
+                            "Vetri AI error:",
+                            data.error
+                        );
+
+
+                        addAIMessage(
+                            data.error ||
+                            "Vetri AI could not answer your question."
+                        );
+
+
+                        return;
+                    }
+
+
+                    /* SUCCESS */
+
+                    displayAIResponse(
+                        data
+                    );
+
+                }
+
+
+                catch (error) {
+
+                    removeLoading();
+
+
+                    console.error(
+                        "Chatbot connection error:",
+                        error
+                    );
+
+
+                    addAIMessage(
+                        "Unable to connect to Vetri AI. " +
+                        "Please check that your Django server is running."
+                    );
+                }
+
+
+                finally {
+
+                    chatSendButton.disabled =
+                        false;
+
+                    chatSendButton.textContent =
+                        "Send";
+
+                    chatQuestion.focus();
+                }
+
+            }
+        );
+
+
+        /* =========================================
+           ENTER KEY
+        ========================================= */
+
+        chatQuestion.addEventListener(
+            "keydown",
+            function (event) {
+
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    chatForm.requestSubmit();
+                }
+
+            }
+        );
+
+
+        /* =========================================
+           INITIAL MESSAGE
+        ========================================= */
+
+        addAIMessage(
+            "Hello! I'm Vetri AI. Ask me anything about your products, catalog, recommendations, SEO, product descriptions, orders and more."
+        );
+
+    });
+
+
+
+</script>
+
+{% endblock %}

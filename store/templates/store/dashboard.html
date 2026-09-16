@@ -1,0 +1,134 @@
+{% extends 'store/base.html' %}
+
+{% block content %}
+
+<div class="dashboard-container">
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1>Vetri AI Dashboard</h1>
+            <p>Welcome to your e-commerce management dashboard.</p>
+        </div>
+
+        <div class="role-box">
+            Role:
+            <strong>{{ role }}</strong>
+        </div>
+    </div>
+
+
+    <!-- Statistics -->
+    <div class="row g-4">
+
+        <!-- Products -->
+        <div class="col-lg-3 col-md-6">
+            <div class="dashboard-card">
+                <div class="card-icon">📦</div>
+                <div class="card-content">
+                    <h2>{{ products_count }}</h2>
+                    <p>Total Products</p>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Categories -->
+        <div class="col-lg-3 col-md-6">
+            <div class="dashboard-card">
+                <div class="card-icon">📂</div>
+                <div class="card-content">
+                    <h2>{{ categories_count }}</h2>
+                    <p>Total Categories</p>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Orders -->
+        <div class="col-lg-3 col-md-6">
+            <div class="dashboard-card">
+                <div class="card-icon">🛒</div>
+                <div class="card-content">
+                    <h2>{{ orders_count }}</h2>
+                    <p>Total Orders</p>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Customers -->
+        <div class="col-lg-3 col-md-6">
+            <div class="dashboard-card">
+                <div class="card-icon">👥</div>
+                <div class="card-content">
+                    <h2>{{ customers_count }}</h2>
+                    <p>Total Customers</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- Quick Actions -->
+    <div class="dashboard-section">
+
+        <h3>Quick Actions</h3>
+
+        <div class="quick-actions">
+
+            <a href="{% url 'product_create' %}" class="action-button primary">
+                <span>➕</span>
+                Add Product
+            </a>
+
+            <a href="{% url 'chatbot' %}" class="action-button dark">
+                <span>🤖</span>
+                Open AI Assistant
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- AI Features -->
+    <div class="dashboard-section">
+
+        <h3>Vetri AI Features</h3>
+
+        <div class="ai-grid">
+
+            <a href="{% url 'chatbot' %}" class="ai-card">
+                <div class="ai-icon">🤖</div>
+                <h4>AI Assistant</h4>
+                <p>Ask Vetri AI about your products and store.</p>
+            </a>
+
+            <a href="{% url 'chatbot' %}" class="ai-card">
+                <div class="ai-icon">✨</div>
+                <h4>Product Description</h4>
+                <p>Generate product descriptions using AI.</p>
+            </a>
+
+            <a href="{% url 'chatbot' %}" class="ai-card">
+                <div class="ai-icon">🔍</div>
+                <h4>SEO Assistance</h4>
+                <p>Get AI-generated SEO suggestions.</p>
+            </a>
+
+            <a href="{% url 'chatbot' %}" class="ai-card">
+                <div class="ai-icon">💡</div>
+                <h4>Recommendations</h4>
+                <p>Get intelligent product recommendations.</p>
+            </a>
+
+        </div>
+
+    </div>
+
+
+</div>
+
+{% endblock %}

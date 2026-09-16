@@ -1,0 +1,702 @@
+{% extends 'store/base.html' %}
+
+{% block content %}
+
+<div class="container py-5">
+
+<!-- =====================================================
+     PRODUCT DETAILS
+====================================================== -->
+
+<div class="row g-5">
+
+    <!-- PRODUCT IMAGE -->
+    <div class="col-md-6">
+
+        {% if product.image %}
+
+            <img
+                src="{{ product.image.url }}"
+                class="img-fluid rounded shadow-sm detail-img"
+                alt="{{ product.name }}"
+            >
+
+        {% else %}
+
+            <div class="placeholder p-5 text-center border rounded">
+                No product image
+            </div>
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- PRODUCT INFORMATION -->
+    <div class="col-md-6">
+
+        <span class="badge bg-secondary">
+
+            {{ product.category|default:"Uncategorized" }}
+
+        </span>
+
+        <h1 class="mt-3">
+            {{ product.name }}
+        </h1>
+
+        {% if product.brand %}
+
+            <p class="text-muted">
+                Brand: {{ product.brand }}
+            </p>
+
+        {% endif %}
+
+
+        {% if product.description %}
+
+            <p>
+                {{ product.description }}
+            </p>
+
+        {% endif %}
+
+
+        <h2 class="fw-bold">
+            ₹{{ product.price|default:"—" }}
+        </h2>
+
+
+        <p>
+
+            <strong>Stock:</strong>
+
+            {% if product.inventory > 0 %}
+
+                <span class="text-success">
+                    {{ product.inventory }} available
+                </span>
+
+            {% else %}
+
+                <span class="text-danger">
+                    Out of stock
+                </span>
+
+            {% endif %}
+
+        </p>
+
+
+        <!-- ADD TO CART -->
+
+        {% if user.is_authenticated %}
+
+            {% if product.inventory > 0 %}
+
+                <form
+                    method="post"
+                    action="{% url 'add_to_cart' product.pk %}"
+                >
+
+                    {% csrf_token %}
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary btn-lg"
+                    >
+                        Add to Cart
+                    </button>
+
+                </form>
+
+            {% else %}
+
+                <button
+                    class="btn btn-secondary btn-lg"
+                    disabled
+                >
+                    Out of Stock
+                </button>
+
+            {% endif %}
+
+        {% else %}
+
+            <a
+                class="btn btn-primary btn-lg"
+                href="{% url 'login' %}?next={% url 'product_detail' product.pk %}"
+            >
+                Login to Buy
+            </a>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+
+<hr class="my-5">
+
+
+<!-- =====================================================
+     AI PRODUCT INTELLIGENCE
+====================================================== -->
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-dark text-white">
+
+        <h3 class="mb-0">
+            🤖 Vetri AI Product Intelligence
+        </h3>
+
+    </div>
+
+
+    <div class="card-body">
+
+
+        {% if product.ai_analyzed_at %}
+
+            <!-- AI SUMMARY -->
+
+            <div class="alert alert-success">
+
+                <strong>
+                    AI Analysis Available
+                </strong>
+
+                <br>
+
+                Analyzed on:
+                {{ product.ai_analyzed_at }}
+
+            </div>
+
+
+            <!-- AI SCORE -->
+
+            <div class="row g-4 mb-4">
+
+                <div class="col-md-4">
+
+                    <div class="card h-100">
+
+                        <div class="card-body text-center">
+
+                            <h6>
+                                Intelligence Score
+                            </h6>
+
+                            <h2 class="text-primary">
+
+                                {{ product.intelligence_score|default:"0" }}/100
+
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-4">
+
+                    <div class="card h-100">
+
+                        <div class="card-body text-center">
+
+                            <h6>
+                                AI Confidence
+                            </h6>
+
+                            <h2>
+
+                                {% if product.ai_confidence %}
+                                    {{ product.ai_confidence|floatformat:2 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-4">
+
+                    <div class="card h-100">
+
+                        <div class="card-body text-center">
+
+                            <h6>
+                                Image Quality
+                            </h6>
+
+                            <h2>
+
+                                {{ product.image_quality_score|default:"0" }}/100
+
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- BASIC AI INFORMATION -->
+
+            <h4 class="mb-3">
+                Product Recognition
+            </h4>
+
+            <div class="row g-3">
+
+                <div class="col-md-6">
+
+                    <strong>Product Type</strong>
+
+                    <p>
+                        {{ product.ai_product_type|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>AI Category</strong>
+
+                    <p>
+                        {{ product.ai_category|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>AI Subcategory</strong>
+
+                    <p>
+                        {{ product.ai_subcategory|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Style</strong>
+
+                    <p>
+                        {{ product.ai_style|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Use Case</strong>
+
+                    <p>
+                        {{ product.ai_use_case|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Colors</strong>
+
+                    <p>
+
+                        {% if product.ai_colors %}
+
+                            {{ product.ai_colors|join:", " }}
+
+                        {% else %}
+
+                            Not available
+
+                        {% endif %}
+
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Materials</strong>
+
+                    <p>
+
+                        {% if product.ai_materials %}
+
+                            {{ product.ai_materials|join:", " }}
+
+                        {% else %}
+
+                            Not available
+
+                        {% endif %}
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <hr>
+
+
+            <!-- AI GENERATED TITLE -->
+
+            <h4>
+                AI Generated Title
+            </h4>
+
+            <p>
+
+                {{ product.ai_title|default:"Not available" }}
+
+            </p>
+
+
+            <!-- SHORT DESCRIPTION -->
+
+            <h4>
+                AI Short Description
+            </h4>
+
+            <p>
+
+                {{ product.ai_short_description|default:"Not available" }}
+
+            </p>
+
+
+            <!-- BULLETS -->
+
+            <h4>
+                AI Product Highlights
+            </h4>
+
+            {% if product.ai_bullets %}
+
+                <ul>
+
+                    {% for bullet in product.ai_bullets %}
+
+                        <li>
+                            {{ bullet }}
+                        </li>
+
+                    {% endfor %}
+
+                </ul>
+
+            {% else %}
+
+                <p>
+                    No AI highlights available.
+                </p>
+
+            {% endif %}
+
+
+            <hr>
+
+
+            <!-- SEO -->
+
+            <h4>
+                SEO Intelligence
+            </h4>
+
+            <div class="row">
+
+                <div class="col-md-6">
+
+                    <strong>SEO Title</strong>
+
+                    <p>
+                        {{ product.seo_title|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Meta Description</strong>
+
+                    <p>
+                        {{ product.meta_description|default:"Not available" }}
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Keywords</strong>
+
+                    <p>
+
+                        {% if product.keywords %}
+
+                            {{ product.keywords|join:", " }}
+
+                        {% else %}
+
+                            Not available
+
+                        {% endif %}
+
+                    </p>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <strong>Search Phrases</strong>
+
+                    <p>
+
+                        {% if product.search_phrases %}
+
+                            {{ product.search_phrases|join:", " }}
+
+                        {% else %}
+
+                            Not available
+
+                        {% endif %}
+
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <hr>
+
+
+            <!-- OBSERVED FEATURES -->
+
+            <h4>
+                Observed Features
+            </h4>
+
+            {% if product.ai_observed_features %}
+
+                <ul>
+
+                    {% for feature in product.ai_observed_features %}
+
+                        <li>
+                            {{ feature }}
+                        </li>
+
+                    {% endfor %}
+
+                </ul>
+
+            {% else %}
+
+                <p>
+                    No observed features available.
+                </p>
+
+            {% endif %}
+
+
+            <!-- MISSING INFORMATION -->
+
+            <h4>
+                Missing Information
+            </h4>
+
+            {% if product.missing_information %}
+
+                <ul>
+
+                    {% for item in product.missing_information %}
+
+                        <li>
+                            {{ item }}
+                        </li>
+
+                    {% endfor %}
+
+                </ul>
+
+            {% else %}
+
+                <p>
+                    No missing information identified.
+                </p>
+
+            {% endif %}
+
+
+            <!-- IMAGE SUGGESTIONS -->
+
+            <h4>
+                Image Quality Suggestions
+            </h4>
+
+            {% if product.image_quality_suggestions %}
+
+                <ul>
+
+                    {% for suggestion in product.image_quality_suggestions %}
+
+                        <li>
+                            {{ suggestion }}
+                        </li>
+
+                    {% endfor %}
+
+                </ul>
+
+            {% else %}
+
+                <p>
+                    No image improvement suggestions.
+                </p>
+
+            {% endif %}
+
+
+            <!-- UNCERTAINTY -->
+
+            {% if product.ai_uncertainty %}
+
+                <div class="alert alert-warning mt-4">
+
+                    <strong>
+                        AI Uncertainty:
+                    </strong>
+
+                    {{ product.ai_uncertainty }}
+
+                </div>
+
+            {% endif %}
+
+
+        {% else %}
+
+            <!-- NO ANALYSIS -->
+
+            <div class="alert alert-info">
+
+                AI analysis has not been generated for this product yet.
+
+            </div>
+
+        {% endif %}
+
+
+        <!-- FULL ANALYSIS BUTTON -->
+
+        <a
+            class="btn btn-outline-primary mt-3"
+            href="{% url 'product_intelligence' product.pk %}"
+        >
+
+            🤖 View / Generate Full AI Analysis
+
+        </a>
+
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     RELATED PRODUCTS
+====================================================== -->
+
+{% if related_products %}
+
+    <section class="mt-5">
+
+        <h3>
+            Related Products
+        </h3>
+
+        <div class="row g-4">
+
+            {% for related in related_products %}
+
+                <div class="col-md-3">
+
+                    <div class="card h-100">
+
+                        {% if related.image %}
+
+                            <img
+                                src="{{ related.image.url }}"
+                                class="card-img-top"
+                                style="height:220px; object-fit:cover;"
+                                alt="{{ related.name }}"
+                            >
+
+                        {% endif %}
+
+                        <div class="card-body">
+
+                            <h5>
+                                {{ related.name }}
+                            </h5>
+
+                            <p>
+                                ₹{{ related.price|default:"—" }}
+                            </p>
+
+                            <a
+                                href="{% url 'product_detail' related.pk %}"
+                                class="btn btn-outline-primary"
+                            >
+                                View Product
+                            </a>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+    </section>
+
+{% endif %}
+
+</div>
+
+{% endblock %}

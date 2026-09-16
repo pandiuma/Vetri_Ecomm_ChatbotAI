@@ -1,0 +1,462 @@
+{% extends "store/base.html" %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <!-- PAGE HEADER -->
+
+    <div class="text-center mb-5">
+
+        <h1 class="fw-bold">
+            📦 Track Your Order
+        </h1>
+
+        <p class="text-muted">
+            Track the latest status and delivery information
+        </p>
+
+    </div>
+
+
+    <!-- ORDER SUMMARY -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-dark text-white">
+
+            <h4 class="mb-0">
+                📋 Order Information
+            </h4>
+
+        </div>
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <!-- ORDER NUMBER -->
+
+                <div class="col-md-6 mb-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Order Number
+                        </small>
+
+                        <h5 class="fw-bold mt-1">
+                            {{ order.order_number }}
+                        </h5>
+
+                    </div>
+
+                </div>
+
+
+                <!-- TRACKING NUMBER -->
+
+                <div class="col-md-6 mb-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Tracking Number
+                        </small>
+
+                        <h5 class="fw-bold mt-1">
+                            {% if order.tracking_number %}
+                                {{ order.tracking_number }}
+                            {% else %}
+                                Not assigned yet
+                            {% endif %}
+                        </h5>
+
+                    </div>
+
+                </div>
+
+
+                <!-- CURRENT STATUS -->
+
+                <div class="col-md-6 mb-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Current Status
+                        </small>
+
+                        <h5 class="fw-bold mt-1">
+
+                            {% if order.status == "delivered" %}
+
+                                <span class="badge bg-success">
+                                    ✓ {{ order.get_status_display }}
+                                </span>
+
+                            {% elif order.status == "cancelled" %}
+
+                                <span class="badge bg-danger">
+                                    ✕ {{ order.get_status_display }}
+                                </span>
+
+                            {% elif order.status == "out_for_delivery" %}
+
+                                <span class="badge bg-warning text-dark">
+                                    🚚 {{ order.get_status_display }}
+                                </span>
+
+                            {% elif order.status == "shipped" %}
+
+                                <span class="badge bg-primary">
+                                    📦 {{ order.get_status_display }}
+                                </span>
+
+                            {% elif order.status == "processing" %}
+
+                                <span class="badge bg-info text-dark">
+                                    ⚙ {{ order.get_status_display }}
+                                </span>
+
+                            {% else %}
+
+                                <span class="badge bg-secondary">
+                                    {{ order.get_status_display }}
+                                </span>
+
+                            {% endif %}
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+
+                <!-- COURIER -->
+
+                <div class="col-md-6 mb-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Courier
+                        </small>
+
+                        <h5 class="fw-bold mt-1">
+
+                            {% if order.courier_name %}
+                                🚚 {{ order.courier_name }}
+                            {% else %}
+                                Courier not assigned
+                            {% endif %}
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ESTIMATED DELIVERY -->
+
+                <div class="col-md-6 mb-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Estimated Delivery
+                        </small>
+
+                        <h5 class="fw-bold mt-1">
+
+                            {% if order.estimated_delivery %}
+
+                                📅
+                                {{ order.estimated_delivery|date:"d M Y" }}
+
+                            {% else %}
+
+                                Delivery date not available
+
+                            {% endif %}
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ORDER DATE -->
+
+                <div class="col-md-6 mb-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Order Date
+                        </small>
+
+                        <h5 class="fw-bold mt-1">
+
+                            {{ order.created_at|date:"d M Y, h:i A" }}
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- DELIVERY ADDRESS -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <h4 class="mb-0">
+                📍 Delivery Address
+            </h4>
+
+        </div>
+
+        <div class="card-body">
+
+            <h5 class="fw-bold">
+                {{ order.full_name }}
+            </h5>
+
+            <p class="mb-1">
+                {{ order.address }}
+            </p>
+
+            <p class="mb-1">
+                {{ order.city }},
+                {{ order.state }}
+                - {{ order.pincode }}
+            </p>
+
+            <p class="mb-0">
+                📞 {{ order.phone }}
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- TRACKING TIMELINE -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-dark text-white">
+
+            <h4 class="mb-0">
+                🚚 Tracking History
+            </h4>
+
+        </div>
+
+        <div class="card-body">
+
+            {% if tracking %}
+
+                {% for update in tracking %}
+
+                    <div class="d-flex mb-4">
+
+                        <!-- ICON -->
+
+                        <div
+                            class="me-3 d-flex align-items-start justify-content-center"
+                            style="
+                                width:45px;
+                                min-width:45px;
+                                height:45px;
+                                border-radius:50%;
+                                background:#198754;
+                                color:white;
+                                font-size:20px;
+                            "
+                        >
+
+                            {% if update.status == "delivered" %}
+                                ✓
+                            {% elif update.status == "out_for_delivery" %}
+                                🚚
+                            {% elif update.status == "shipped" %}
+                                📦
+                            {% elif update.status == "processing" %}
+                                ⚙
+                            {% elif update.status == "confirmed" %}
+                                ✓
+                            {% else %}
+                                🛒
+                            {% endif %}
+
+                        </div>
+
+
+                        <!-- TRACKING DETAILS -->
+
+                        <div class="border rounded p-3 flex-grow-1">
+
+                            <div
+                                class="d-flex justify-content-between flex-wrap"
+                            >
+
+                                <h5 class="fw-bold mb-1">
+
+                                    {{ update.get_status_display }}
+
+                                </h5>
+
+                                <small class="text-muted">
+
+                                    {{ update.created_at|date:"d M Y, h:i A" }}
+
+                                </small>
+
+                            </div>
+
+
+                            {% if update.description %}
+
+                                <p class="mb-1 mt-2">
+
+                                    {{ update.description }}
+
+                                </p>
+
+                            {% endif %}
+
+
+                            {% if update.location %}
+
+                                <small class="text-muted">
+
+                                    📍 {{ update.location }}
+
+                                </small>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <div class="alert alert-info text-center">
+
+                    Tracking information is not available yet.
+
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- ORDER ITEMS -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <h4 class="mb-0">
+                🛍 Order Items
+            </h4>
+
+        </div>
+
+        <div class="card-body">
+
+            {% for item in order.items.all %}
+
+                <div
+                    class="d-flex justify-content-between align-items-center border-bottom py-3"
+                >
+
+                    <div>
+
+                        <h6 class="fw-bold mb-1">
+                            {{ item.product.name }}
+                        </h6>
+
+                        <small class="text-muted">
+
+                            Quantity:
+                            {{ item.quantity }}
+
+                        </small>
+
+                    </div>
+
+                    <div class="text-end">
+
+                        <strong>
+                            ₹{{ item.price }}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            {% endfor %}
+
+
+            <!-- TOTAL -->
+
+            <div class="d-flex justify-content-between mt-4">
+
+                <h5 class="fw-bold">
+                    Total
+                </h5>
+
+                <h5 class="fw-bold">
+                    ₹{{ order.total }}
+                </h5>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ACTION BUTTONS -->
+
+    <div class="text-center">
+
+        <a
+            href="{% url 'order_detail' order.pk %}"
+            class="btn btn-primary me-2"
+        >
+            📋 Order Details
+        </a>
+
+        <a
+            href="{% url 'order_history' %}"
+            class="btn btn-outline-secondary"
+        >
+            ← My Orders
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}

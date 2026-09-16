@@ -1,0 +1,24 @@
+{% extends 'store/base.html' %}{% block content %}<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Products</h1>{% if user.is_authenticated %}<a class="btn btn-primary" href="{% url 'product_create' %}">+
+            Add Product</a>{% endif %}
+    </div>
+    <form class="row g-2 mb-4">
+        <div class="col-md-6"><input class="form-control" name="q" value="{{ q }}" placeholder="Search products...">
+        </div>
+        <div class="col-md-4"><select class="form-select" name="category">
+                <option value="">All categories</option>{% for c in categories %}<option value="{{ c.id }}">{{ c.name }}
+                </option>{% endfor %}
+            </select></div>
+        <div class="col-md-2"><button class="btn btn-dark w-100">Search</button></div>
+    </form>
+    <div class="row g-4">{% for p in products %}<div class="col-md-4 col-lg-3">
+            <div class="product-card">{% if p.image %}<img src="{{ p.image.url }}">{% endif %}<div class="p-3">
+                    <h5>{{ p.name }}</h5>
+                    <p>{{ p.category }}</p>
+                    <h6>₹{{ p.price|default:'—' }}</h6><a class="btn btn-outline-dark w-100"
+                        href="{{ p.get_absolute_url }}">View</a>
+                </div>
+            </div>
+        </div>{% empty %}<p>No products found.</p>{% endfor %}</div>
+</div>{% endblock %}
