@@ -28,7 +28,7 @@ DEBUG = os.getenv( "DEBUG", "True" ).lower() == "true"
 ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
-    "vetri-ecomm-chatbot-ai.vercel.app",
+    ".vercel.app",
 ]
 
 # SECURITY WARNING: don't run with debug turned on in production!
