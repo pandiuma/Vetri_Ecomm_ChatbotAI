@@ -1,41 +1,34 @@
-
-
-
 /* Login page background */
 
 .auth-page {
-    background:
-        radial-gradient(
-            circle at 10% 20%,
-            rgba(108, 76, 241, 0.10),
-            transparent 30%
-        ),
-        radial-gradient(
-            circle at 90% 80%,
-            rgba(108, 76, 241, 0.08),
-            transparent 30%
-        ),
-        #f7f8fc;
-
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
     padding: 45px 20px;
+    background: #f7f8fc;
 }
 
+.auth-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
 
-/* Login card */
+    background-image: url("https://res.cloudinary.com/zousogxh/image/upload/v1790151605/background.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    z-index: 0;
+}
 
 .auth-card {
     position: relative;
-
-    border: 1px solid rgba(108, 76, 241, 0.10);
-
-    border-radius: 24px;
-
-    box-shadow:
-        0 20px 60px rgba(23, 27, 52, 0.12);
-
-    transition: 0.3s ease;
-    background-color:lightpink;
+    z-index: 2;
 }
+
 
 .auth-card:hover {
     box-shadow:
