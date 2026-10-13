@@ -1,0 +1,1043 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="vetri-admin-wrapper">
+
+<!-- =====================================================
+     HEADER
+====================================================== -->
+
+<div class="vetri-dashboard-header">
+
+    <div>
+        <span class="vetri-eyebrow">
+            <i class="fas fa-chart-line"></i>
+            ADMIN CONTROL CENTER
+        </span>
+
+        <h1>Welcome back, {{ user.get_username }}</h1>
+
+        <p>
+            Manage your ecommerce catalog, orders, users and
+            AI-powered product intelligence.
+        </p>
+    </div>
+
+    <div class="vetri-header-actions">
+
+        <a href="/" class="vetri-site-btn">
+            <i class="fas fa-globe"></i>
+            View Store
+        </a>
+
+        <a href="{% url 'admin:password_change' %}"
+           class="vetri-secondary-btn">
+            <i class="fas fa-key"></i>
+            Password
+        </a>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     SUMMARY CARDS
+====================================================== -->
+
+<div class="vetri-stat-grid">
+
+    <div class="vetri-stat-card">
+        <div class="vetri-stat-icon product-icon">
+            <i class="fas fa-box"></i>
+        </div>
+
+        <div>
+            <span>Products</span>
+            <strong>{{ app_list.1.models|length }}</strong>
+            <small>Catalog management</small>
+        </div>
+    </div>
+
+
+    <div class="vetri-stat-card">
+        <div class="vetri-stat-icon order-icon">
+            <i class="fas fa-shopping-cart"></i>
+        </div>
+
+        <div>
+            <span>Commerce</span>
+            <strong>Orders</strong>
+            <small>Orders & tracking</small>
+        </div>
+    </div>
+
+
+    <div class="vetri-stat-card">
+        <div class="vetri-stat-icon ai-icon">
+            <i class="fas fa-brain"></i>
+        </div>
+
+        <div>
+            <span>AI Intelligence</span>
+            <strong>AI</strong>
+            <small>Product intelligence</small>
+        </div>
+    </div>
+
+
+    <div class="vetri-stat-card">
+        <div class="vetri-stat-icon user-icon">
+            <i class="fas fa-users"></i>
+        </div>
+
+        <div>
+            <span>Administration</span>
+            <strong>Users</strong>
+            <small>Access & profiles</small>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     MAIN ADMIN APPLICATIONS
+====================================================== -->
+
+<div class="vetri-section-heading">
+
+    <div>
+        <h2>Administration</h2>
+        <p>Manage your Vetri AI ecommerce platform.</p>
+    </div>
+
+</div>
+
+
+<div class="vetri-admin-grid">
+
+    {% for app in app_list %}
+
+        <div class="vetri-admin-card">
+
+            <div class="vetri-admin-card-header">
+
+                <div class="vetri-app-icon">
+
+                    {% if app.app_label == "store" %}
+
+                        <i class="fas fa-store"></i>
+
+                    {% elif app.app_label == "auth" %}
+
+                        <i class="fas fa-user-shield"></i>
+
+                    {% else %}
+
+                        <i class="fas fa-cube"></i>
+
+                    {% endif %}
+
+                </div>
+
+                <div>
+
+                    <h3>{{ app.name }}</h3>
+
+                    <span>
+                        {{ app.models|length }} management sections
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="vetri-model-list">
+
+                {% for model in app.models %}
+
+                    <div class="vetri-model-row">
+
+                        <div class="vetri-model-name">
+
+                            {% if model.admin_url %}
+
+                                <a href="{{ model.admin_url }}">
+                                    {{ model.name }}
+                                </a>
+
+                            {% else %}
+
+                                <span>{{ model.name }}</span>
+
+                            {% endif %}
+
+                        </div>
+
+
+                        <div class="vetri-model-actions">
+
+                            {% if model.add_url %}
+
+                                <a href="{{ model.add_url }}"
+                                   class="vetri-add-btn"
+                                   title="Add {{ model.name }}">
+
+                                    <i class="fas fa-plus"></i>
+
+                                </a>
+
+                            {% endif %}
+
+
+                            {% if model.admin_url %}
+
+                                <a href="{{ model.admin_url }}"
+                                   class="vetri-view-btn">
+
+                                    Manage
+
+                                </a>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    {% endfor %}
+
+</div>
+
+
+<!-- =====================================================
+     RECENT ACTIONS
+====================================================== -->
+
+{% if user.is_active and user.is_staff %}
+
+    <div class="vetri-recent-section">
+
+        <div class="vetri-section-heading">
+
+            <div>
+
+                <h2>Recent Activity</h2>
+
+                <p>
+                    Your latest administration actions.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        {% load log %}
+
+        {% get_admin_log 10 as admin_log %}
+
+
+        {% if admin_log %}
+
+            <div class="vetri-activity-list">
+
+                {% for entry in admin_log %}
+
+                    <div class="vetri-activity-item">
+
+                        <div class="vetri-activity-icon">
+
+                            {% if entry.is_addition %}
+
+                                <i class="fas fa-plus"></i>
+
+                            {% elif entry.is_change %}
+
+                                <i class="fas fa-pen"></i>
+
+                            {% elif entry.is_deletion %}
+
+                                <i class="fas fa-trash"></i>
+
+                            {% endif %}
+
+                        </div>
+
+
+                        <div class="vetri-activity-content">
+
+                            <strong>
+                                {{ entry.object_repr }}
+                            </strong>
+
+                            <span>
+                                {{ entry.content_type.name|capfirst }}
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="vetri-empty-state">
+
+                <i class="fas fa-clock"></i>
+
+                <p>No recent activity.</p>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+{% endif %}
+
+
+<!-- =====================================================
+     AI ASSISTANT BANNER
+====================================================== -->
+
+<div class="vetri-ai-banner">
+
+    <div class="vetri-ai-banner-icon">
+
+        <i class="fas fa-robot"></i>
+
+    </div>
+
+
+    <div class="vetri-ai-banner-content">
+
+        <span>VETRI AI ADMIN ASSISTANT</span>
+
+        <h2>Need help with your store?</h2>
+
+        <p>
+            Ask Vetri AI about products, inventory, orders,
+            categories and ecommerce intelligence.
+        </p>
+
+    </div>
+
+
+    <button type="button"
+            class="vetri-ai-open-btn"
+            onclick="openVetriAdminChat()">
+
+        <i class="fas fa-comment-dots"></i>
+
+        Ask Vetri AI
+
+    </button>
+
+</div>
+```
+
+</div>
+
+<!-- =========================================================
+     FLOATING ADMIN AI CHATBOT
+========================================================= -->
+
+<div id="vetriAdminChat"
+     class="vetri-admin-chat">
+
+```
+<!-- =====================================================
+     CHAT HEADER
+====================================================== -->
+
+<div class="vetri-chat-header">
+
+    <div class="vetri-chat-title">
+
+        <div class="vetri-chat-avatar">
+
+            <i class="fas fa-robot"></i>
+
+        </div>
+
+
+        <div>
+
+            <strong>Vetri AI</strong>
+
+            <span>Admin Assistant</span>
+
+        </div>
+
+    </div>
+
+
+    <button type="button"
+            onclick="closeVetriAdminChat()"
+            aria-label="Close chatbot">
+
+        <i class="fas fa-xmark"></i>
+
+    </button>
+
+</div>
+
+
+
+<!-- =====================================================
+     CHAT MESSAGES
+====================================================== -->
+
+<div id="vetriAdminMessages"
+     class="vetri-chat-messages">
+
+
+    <div class="vetri-ai-message">
+
+        <div class="vetri-message-avatar">
+
+            <i class="fas fa-robot"></i>
+
+        </div>
+
+
+        <div class="vetri-message-bubble">
+
+            Hello {{ user.get_username }} 👋
+
+            <br><br>
+
+            I’m your Vetri AI Admin Assistant.
+
+            <br><br>
+
+            You can ask me about your products,
+            inventory, orders, categories and more.
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- =====================================================
+     TYPING INDICATOR
+====================================================== -->
+
+<div id="vetriAdminTyping"
+     class="vetri-ai-message vetri-typing-message"
+     style="display:none;">
+
+    <div class="vetri-message-avatar">
+
+        <i class="fas fa-robot"></i>
+
+    </div>
+
+
+    <div class="vetri-message-bubble">
+
+        <span class="vetri-typing-dots">
+            <span>.</span>
+            <span>.</span>
+            <span>.</span>
+        </span>
+
+    </div>
+
+</div>
+
+
+
+<!-- =====================================================
+     CHAT INPUT
+====================================================== -->
+
+<div class="vetri-chat-input-area">
+
+    <input type="text"
+           id="vetriAdminInput"
+           placeholder="Ask Vetri AI..."
+           autocomplete="off">
+
+
+    <button type="button"
+            id="vetriAdminSendButton"
+            onclick="sendVetriAdminMessage()"
+            aria-label="Send message">
+
+        <i class="fas fa-paper-plane"></i>
+
+    </button>
+
+</div>
+```
+
+</div>
+
+<!-- =========================================================
+     VETRI AI ADMIN CHAT JAVASCRIPT
+========================================================= -->
+
+<script>
+
+/* =========================================================
+   OPEN CHAT
+========================================================= */
+
+function openVetriAdminChat() {
+
+    const chat = document.getElementById("vetriAdminChat");
+    const input = document.getElementById("vetriAdminInput");
+
+    if (!chat) {
+        return;
+    }
+
+    chat.classList.add("active");
+
+    setTimeout(function () {
+
+        if (input) {
+            input.focus();
+        }
+
+    }, 150);
+
+}
+
+
+/* =========================================================
+   CLOSE CHAT
+========================================================= */
+
+function closeVetriAdminChat() {
+
+    const chat = document.getElementById("vetriAdminChat");
+
+    if (chat) {
+        chat.classList.remove("active");
+    }
+
+}
+
+
+/* =========================================================
+   GET CSRF TOKEN
+========================================================= */
+
+function getVetriCSRFToken() {
+
+    const cookieValue = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("csrftoken="));
+
+    if (!cookieValue) {
+        return "";
+    }
+
+    return decodeURIComponent(
+        cookieValue.split("=")[1]
+    );
+
+}
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeVetriHTML(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+
+}
+
+
+/* =========================================================
+   ADD USER MESSAGE
+========================================================= */
+
+function addVetriUserMessage(message) {
+
+    const messages =
+        document.getElementById("vetriAdminMessages");
+
+    if (!messages) {
+        return;
+    }
+
+
+    const userMessage =
+        document.createElement("div");
+
+    userMessage.className =
+        "vetri-user-message";
+
+
+    userMessage.innerHTML = `
+
+        <div class="vetri-user-bubble">
+
+            ${escapeVetriHTML(message)}
+
+        </div>
+
+    `;
+
+
+    messages.appendChild(userMessage);
+
+    messages.scrollTop =
+        messages.scrollHeight;
+
+}
+
+
+/* =========================================================
+   ADD AI MESSAGE
+========================================================= */
+
+function addVetriAIMessage(message) {
+
+    const messages =
+        document.getElementById("vetriAdminMessages");
+
+    if (!messages) {
+        return;
+    }
+
+
+    const aiMessage =
+        document.createElement("div");
+
+    aiMessage.className =
+        "vetri-ai-message";
+
+
+    aiMessage.innerHTML = `
+
+        <div class="vetri-message-avatar">
+
+            <i class="fas fa-robot"></i>
+
+        </div>
+
+
+        <div class="vetri-message-bubble">
+
+            ${escapeVetriHTML(message)}
+
+        </div>
+
+    `;
+
+
+    messages.appendChild(aiMessage);
+
+    messages.scrollTop =
+        messages.scrollHeight;
+
+}
+
+
+/* =========================================================
+   SHOW TYPING
+========================================================= */
+
+function showVetriTyping() {
+
+    const typing =
+        document.getElementById("vetriAdminTyping");
+
+    if (typing) {
+        typing.style.display = "flex";
+    }
+
+
+    const messages =
+        document.getElementById("vetriAdminMessages");
+
+    if (messages) {
+
+        messages.scrollTop =
+            messages.scrollHeight;
+
+    }
+
+}
+
+
+/* =========================================================
+   HIDE TYPING
+========================================================= */
+
+function hideVetriTyping() {
+
+    const typing =
+        document.getElementById("vetriAdminTyping");
+
+    if (typing) {
+        typing.style.display = "none";
+    }
+
+}
+
+
+/* =========================================================
+   ENABLE / DISABLE SEND BUTTON
+========================================================= */
+
+function setVetriSendState(disabled) {
+
+    const button =
+        document.getElementById("vetriAdminSendButton");
+
+    if (button) {
+        button.disabled = disabled;
+    }
+
+}
+
+
+/* =========================================================
+   SEND MESSAGE TO EXISTING CHATBOT API
+========================================================= */
+
+async function sendVetriAdminMessage() {
+
+    const input =
+        document.getElementById("vetriAdminInput");
+
+    if (!input) {
+        return;
+    }
+
+
+    const message =
+        input.value.trim();
+
+
+    if (!message) {
+        return;
+    }
+
+
+    /*
+       Prevent duplicate requests while
+       Vetri AI is processing.
+    */
+
+    if (input.disabled) {
+        return;
+    }
+
+
+    /* Display user message */
+
+    addVetriUserMessage(message);
+
+
+    /* Clear input */
+
+    input.value = "";
+
+
+    /* Disable input */
+
+    input.disabled = true;
+
+    setVetriSendState(true);
+
+    showVetriTyping();
+
+
+    try {
+
+        /*
+           IMPORTANT:
+
+           This uses your EXISTING chatbot_api.
+
+           No new AI system is created here.
+        */
+
+        const response =
+            await fetch("{% url 'chatbot_api' %}", {
+
+                method: "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "X-CSRFToken":
+                        getVetriCSRFToken(),
+
+                    "X-Requested-With":
+                        "XMLHttpRequest"
+
+                },
+
+                body: JSON.stringify({
+
+                    question: message
+
+                })
+
+            });
+
+
+        /* Check HTTP response */
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Server returned HTTP " +
+                response.status
+            );
+
+        }
+
+
+        /* Read JSON */
+
+        const data =
+            await response.json();
+
+
+        hideVetriTyping();
+
+
+        /*
+           Your existing chatbot_api returns
+           an "answer" field.
+        */
+
+        if (data.success !== false &&
+            data.answer) {
+
+            addVetriAIMessage(
+                data.answer
+            );
+
+        }
+
+        else {
+
+            addVetriAIMessage(
+                data.answer ||
+                "Sorry, I couldn't process your question."
+            );
+
+        }
+
+
+        /*
+           If your existing API returns product
+           cards, display their basic information
+           inside the admin chat as well.
+        */
+
+        if (Array.isArray(data.products) &&
+            data.products.length > 0) {
+
+            addVetriProductResults(
+                data.products
+            );
+
+        }
+
+    }
+
+
+    catch (error) {
+
+        console.error(
+            "Vetri AI Admin Chat Error:",
+            error
+        );
+
+
+        hideVetriTyping();
+
+
+        addVetriAIMessage(
+            "Sorry, I couldn't connect to Vetri AI right now. Please try again."
+        );
+
+    }
+
+
+    finally {
+
+        input.disabled = false;
+
+        setVetriSendState(false);
+
+        input.focus();
+
+    }
+
+}
+
+
+/* =========================================================
+   PRODUCT RESULTS
+========================================================= */
+
+function addVetriProductResults(products) {
+
+    const messages =
+        document.getElementById("vetriAdminMessages");
+
+    if (!messages) {
+        return;
+    }
+
+
+    const resultContainer =
+        document.createElement("div");
+
+    resultContainer.className =
+        "vetri-ai-message";
+
+
+    const avatar =
+        document.createElement("div");
+
+    avatar.className =
+        "vetri-message-avatar";
+
+    avatar.innerHTML =
+        '<i class="fas fa-box"></i>';
+
+
+    const content =
+        document.createElement("div");
+
+    content.className =
+        "vetri-message-bubble";
+
+
+    let html =
+        "<strong>Products</strong><br><br>";
+
+
+    products.forEach(function(product) {
+
+        const name =
+            escapeVetriHTML(
+                product.name || "Product"
+            );
+
+
+        const price =
+            product.price !== undefined
+                ? "₹" + product.price
+                : "";
+
+
+        html += `
+
+            <div style="
+                margin-bottom:10px;
+                padding-bottom:10px;
+                border-bottom:1px solid #eee;
+            ">
+
+                <strong>${name}</strong>
+
+                ${price
+                    ? `<br><span>${price}</span>`
+                    : ""
+                }
+
+            </div>
+
+        `;
+
+    });
+
+
+    content.innerHTML = html;
+
+
+    resultContainer.appendChild(avatar);
+
+    resultContainer.appendChild(content);
+
+
+    messages.appendChild(resultContainer);
+
+
+    messages.scrollTop =
+        messages.scrollHeight;
+
+}
+
+
+/* =========================================================
+   ENTER KEY
+========================================================= */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        const input =
+            document.getElementById(
+                "vetriAdminInput"
+            );
+
+
+        if (!input) {
+            return;
+        }
+
+
+        input.addEventListener(
+            "keydown",
+            function (event) {
+
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    sendVetriAdminMessage();
+
+                }
+
+            }
+        );
+
+    }
+);
+
+</script>
+
+{% endblock %}

@@ -8,6 +8,8 @@ from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Sum
+from django.utils import timezone
 
 from .ai_services import analyze_product, chatbot_answer
 from .models import (
@@ -1110,7 +1112,9 @@ def chatbot_api(request):
             "products": [],
         })
 
-    question = str(body.get("question", "")).strip()
+    question = str(
+        body.get("question", "")
+    ).strip()
 
     if not question:
         return JsonResponse({
@@ -1139,7 +1143,10 @@ def chatbot_api(request):
 
     products = (
         Product.objects
-        .select_related("category", "subcategory")
+        .select_related(
+            "category",
+            "subcategory"
+        )
         .all()
         .order_by("-id")[:100]
     )
@@ -1157,18 +1164,33 @@ def chatbot_api(request):
                 image_url = ""
 
         product_data.append({
+
             "id": product.id,
+
             "name": product.name,
+
             "brand": product.brand or "",
+
             "sku": product.sku or "",
-            "price": float(product.price or 0),
-            "cost": float(product.cost or 0),
+
+            "price": float(
+                product.price or 0
+            ),
+
+            "cost": float(
+                product.cost or 0
+            ),
 
             "image": image_url,
+
             "image_url": image_url,
+
             "chatbot_image_url": image_url,
 
-            "inventory": int(product.inventory or 0),
+            "inventory": int(
+                product.inventory or 0
+            ),
+
             "lifecycle": product.lifecycle or "",
 
             "category": (
@@ -1183,19 +1205,53 @@ def chatbot_api(request):
                 else ""
             ),
 
-            "description": product.description or "",
+            "description": (
+                product.description or ""
+            ),
 
-            "ai_product_type": product.ai_product_type or "",
-            "ai_category": product.ai_category or "",
-            "ai_subcategory": product.ai_subcategory or "",
-            "ai_colors": product.ai_colors or [],
-            "ai_materials": product.ai_materials or [],
-            "ai_style": product.ai_style or "",
-            "ai_use_case": product.ai_use_case or "",
-            "ai_confidence": product.ai_confidence,
-            "ai_attributes": product.ai_attributes or {},
-            "keywords": product.keywords or [],
-            "search_phrases": product.search_phrases or [],
+            "ai_product_type": (
+                product.ai_product_type or ""
+            ),
+
+            "ai_category": (
+                product.ai_category or ""
+            ),
+
+            "ai_subcategory": (
+                product.ai_subcategory or ""
+            ),
+
+            "ai_colors": (
+                product.ai_colors or []
+            ),
+
+            "ai_materials": (
+                product.ai_materials or []
+            ),
+
+            "ai_style": (
+                product.ai_style or ""
+            ),
+
+            "ai_use_case": (
+                product.ai_use_case or ""
+            ),
+
+            "ai_confidence": (
+                product.ai_confidence
+            ),
+
+            "ai_attributes": (
+                product.ai_attributes or {}
+            ),
+
+            "keywords": (
+                product.keywords or []
+            ),
+
+            "search_phrases": (
+                product.search_phrases or []
+            ),
         })
 
     # ============================================================
@@ -1205,17 +1261,33 @@ def chatbot_api(request):
     def make_product_card(product):
 
         return {
+
             "id": product.get("id"),
 
-            "name": product.get("name", ""),
+            "name": product.get(
+                "name",
+                ""
+            ),
 
-            "brand": product.get("brand", ""),
+            "brand": product.get(
+                "brand",
+                ""
+            ),
 
-            "price": product.get("price", 0),
+            "price": product.get(
+                "price",
+                0
+            ),
 
-            "inventory": product.get("inventory", 0),
+            "inventory": product.get(
+                "inventory",
+                0
+            ),
 
-            "image": product.get("image", ""),
+            "image": product.get(
+                "image",
+                ""
+            ),
 
             "image_url": product.get(
                 "image_url",
@@ -1229,24 +1301,926 @@ def chatbot_api(request):
 
             # ADD TO CART LINK
             "cart_url": (
-                f"/cart/add/{product.get('id')}/"
+                f"/cart/add/"
+                f"{product.get('id')}/"
             ),
 
             # PRODUCT DETAILS LINK
             "product_url": (
-                f"/products/{product.get('id')}/"
+                f"/products/"
+                f"{product.get('id')}/"
             ),
         }
 
     # ============================================================
-    # 4. GREETING
+    # 4. SALES / SOLD PRODUCT QUESTIONS
+    # ============================================================
+
+    sales_question_words = [
+
+        "sold today",
+
+        "sales today",
+
+        "how many sold today",
+
+        "how many products sold today",
+
+        "how many product sold today",
+
+        "how many are sold today",
+
+        "how many sold",
+
+        "how many products sold",
+
+        "how many product sold",
+
+        "howmany products sold today",
+
+        "howmany product sold today",
+
+        "howmany sold today",
+    ]
+
+    is_sales_question = any(
+        phrase in clean_question
+        for phrase in sales_question_words
+    )
+
+    if is_sales_question:
+
+        today = timezone.localdate()
+
+        # --------------------------------------------------------
+        # FIND PRODUCTS FOR CATEGORY-SPECIFIC SALES QUESTIONS
+        # --------------------------------------------------------
+
+        sales_product_ids = None
+
+        # --------------------------------------------------------
+        # BACKPACK SALES
+        # --------------------------------------------------------
+
+        if (
+            "backpack" in clean_question
+            or "backpacks" in clean_question
+        ):
+
+            sales_product_ids = []
+
+            for product in product_data:
+
+                product_text = " ".join([
+
+                    str(
+                        product.get(
+                            "name",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "subcategory",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "description",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_product_type",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_subcategory",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "keywords",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "search_phrases",
+                            ""
+                        )
+                    ),
+
+                ]).lower()
+
+                if "backpack" in product_text:
+
+                    sales_product_ids.append(
+                        product.get("id")
+                    )
+
+        # --------------------------------------------------------
+        # HANDBAG SALES
+        # --------------------------------------------------------
+
+        elif (
+            "handbag" in clean_question
+            or "handbags" in clean_question
+        ):
+
+            handbag_words = [
+
+                "handbag",
+
+                "handbags",
+
+                "purse",
+
+                "shoulder bag",
+
+                "leather bag",
+
+                "women bag",
+            ]
+
+            sales_product_ids = []
+
+            for product in product_data:
+
+                product_text = " ".join([
+
+                    str(
+                        product.get(
+                            "name",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "subcategory",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "description",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_product_type",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_subcategory",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "keywords",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "search_phrases",
+                            ""
+                        )
+                    ),
+
+                ]).lower()
+
+                if any(
+                    word in product_text
+                    for word in handbag_words
+                ):
+
+                    sales_product_ids.append(
+                        product.get("id")
+                    )
+
+        # --------------------------------------------------------
+        # KEYBOARD SALES
+        # --------------------------------------------------------
+
+        elif "keyboard" in clean_question:
+
+            sales_product_ids = []
+
+            for product in product_data:
+
+                product_text = " ".join([
+
+                    str(
+                        product.get(
+                            "name",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "subcategory",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "description",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_product_type",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_subcategory",
+                            ""
+                        )
+                    ),
+
+                ]).lower()
+
+                if "keyboard" in product_text:
+
+                    sales_product_ids.append(
+                        product.get("id")
+                    )
+
+        # --------------------------------------------------------
+        # SNEAKER / SHOE SALES
+        # --------------------------------------------------------
+
+        elif (
+            "sneaker" in clean_question
+            or "sneakers" in clean_question
+            or "shoe" in clean_question
+            or "shoes" in clean_question
+            or "footwear" in clean_question
+        ):
+
+            sales_product_ids = []
+
+            for product in product_data:
+
+                product_text = " ".join([
+
+                    str(
+                        product.get(
+                            "name",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "subcategory",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "description",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_product_type",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_category",
+                            ""
+                        )
+                    ),
+
+                    str(
+                        product.get(
+                            "ai_subcategory",
+                            ""
+                        )
+                    ),
+
+                ]).lower()
+
+                if any(
+                    word in product_text
+                    for word in [
+                        "sneaker",
+                        "shoe",
+                        "footwear",
+                    ]
+                ):
+
+                    sales_product_ids.append(
+                        product.get("id")
+                    )
+
+        # --------------------------------------------------------
+        # GET TODAY'S ORDER ITEMS
+        # --------------------------------------------------------
+
+        today_items = OrderItem.objects.filter(
+            order__created_at__date=today
+        )
+
+        # --------------------------------------------------------
+        # APPLY CATEGORY FILTER ONLY WHEN NEEDED
+        # --------------------------------------------------------
+
+        if sales_product_ids is not None:
+
+            today_items = today_items.filter(
+                product_id__in=sales_product_ids
+            )
+
+        # --------------------------------------------------------
+        # TOTAL QUANTITY SOLD
+        # --------------------------------------------------------
+
+        total_sold = today_items.aggregate(
+            total=Sum("quantity")
+        )["total"] or 0
+
+        total_sold = int(
+            total_sold
+        )
+
+        # --------------------------------------------------------
+        # RESPONSE
+        # --------------------------------------------------------
+
+        if (
+            "backpack" in clean_question
+            or "backpacks" in clean_question
+        ):
+
+            if total_sold == 1:
+
+                sales_answer = (
+                    "📦 **Backpack Sales Today**\n\n"
+                    "We have sold **1 backpack today**."
+                )
+
+            else:
+
+                sales_answer = (
+                    "📦 **Backpack Sales Today**\n\n"
+                    f"We have sold **{total_sold} "
+                    f"backpacks today**."
+                )
+
+        elif (
+            "handbag" in clean_question
+            or "handbags" in clean_question
+        ):
+
+            if total_sold == 1:
+
+                sales_answer = (
+                    "👜 **Handbag Sales Today**\n\n"
+                    "We have sold **1 handbag today**."
+                )
+
+            else:
+
+                sales_answer = (
+                    "👜 **Handbag Sales Today**\n\n"
+                    f"We have sold **{total_sold} "
+                    f"handbags today**."
+                )
+
+        elif "keyboard" in clean_question:
+
+            if total_sold == 1:
+
+                sales_answer = (
+                    "⌨️ **Keyboard Sales Today**\n\n"
+                    "We have sold **1 keyboard today**."
+                )
+
+            else:
+
+                sales_answer = (
+                    "⌨️ **Keyboard Sales Today**\n\n"
+                    f"We have sold **{total_sold} "
+                    f"keyboards today**."
+                )
+
+        elif (
+            "sneaker" in clean_question
+            or "sneakers" in clean_question
+            or "shoe" in clean_question
+            or "shoes" in clean_question
+            or "footwear" in clean_question
+        ):
+
+            if total_sold == 1:
+
+                sales_answer = (
+                    "👟 **Footwear Sales Today**\n\n"
+                    "We have sold **1 footwear product today**."
+                )
+
+            else:
+
+                sales_answer = (
+                    "👟 **Footwear Sales Today**\n\n"
+                    f"We have sold **{total_sold} "
+                    f"footwear products today**."
+                )
+
+        else:
+
+            if total_sold == 1:
+
+                sales_answer = (
+                    "📊 **Today's Sales**\n\n"
+                    "We have sold **1 product today**."
+                )
+
+            else:
+
+                sales_answer = (
+                    "📊 **Today's Sales**\n\n"
+                    f"We have sold **{total_sold} "
+                    f"products today**."
+                )
+
+        # --------------------------------------------------------
+        # IMPORTANT:
+        # DO NOT RETURN PRODUCT CARDS FOR SALES QUESTIONS
+        # --------------------------------------------------------
+
+        return JsonResponse({
+
+            "success": True,
+
+            "type": "sales_results",
+
+            "answer": sales_answer,
+
+            "products": [],
+        })
+     # ============================================================
+     # 4A. SPECIFIC PRODUCT STOCK / COUNT QUESTIONS
+     # ============================================================
+
+    specific_count_intent = (
+          "how many" in clean_question
+          or "howmany" in clean_question
+          or "count" in clean_question
+          or "number of" in clean_question
+          or "total" in clean_question
+    )
+
+    specific_stock_intent = (
+         "available" in clean_question
+         or "in stock" in clean_question
+         or "stock" in clean_question
+    )
+
+    if specific_count_intent or specific_stock_intent:
+
+       # Match the most specific product name first.
+         sorted_products = sorted(
+           product_data,
+           key=lambda item: len(
+              str(item.get("name") or "")
+           ),
+           reverse=True,
+    )
+
+    for product in sorted_products:
+        product_name = str(
+            product.get("name") or ""
+        ).strip()
+
+        if not product_name:
+            continue
+
+        # Allow plural forms of the last word in a product name.
+        name_parts = product_name.lower().split()
+        last_word = name_parts[-1]
+
+        if last_word.endswith("y") and len(last_word) > 1:
+            last_pattern = (
+                re.escape(last_word[:-1]) + r"(?:y|ies)"
+            )
+        elif last_word.endswith(("s", "x", "z", "ch", "sh")):
+            last_pattern = re.escape(last_word) + r"(?:es)?"
+        else:
+            last_pattern = re.escape(last_word) + r"s?"
+
+        if len(name_parts) > 1:
+            name_pattern = (
+                r"\b"
+                + r"\s+".join(
+                    re.escape(word)
+                    for word in name_parts[:-1]
+                )
+                + r"\s+"
+                + last_pattern
+                + r"\b"
+            )
+        else:
+            name_pattern = r"\b" + last_pattern + r"\b"
+
+        if re.search(name_pattern, clean_question):
+            stock_quantity = int(
+                product.get("inventory") or 0
+            )
+
+            if specific_stock_intent:
+                if stock_quantity > 0:
+                    answer = (
+                        f"There are **{stock_quantity} units of "
+                        f"{product_name} available**."
+                    )
+                else:
+                    answer = (
+                        f"**{product_name}** is currently out of stock."
+                    )
+            else:
+                answer = (
+                    f"There is **1 {product_name} product** "
+                    f"in our catalog."
+                )
+
+            return JsonResponse({
+                "success": True,
+                "answer": answer,
+                "products": [make_product_card(product)],
+            })
+
+
+    # ============================================================
+    # 4A. CUSTOMER PURCHASE COUNT FOR TODAY
+    # ============================================================
+
+    customer_purchase_phrases = [
+        "customers purchased today",
+        "customer purchased today",
+        "customers purchase today",
+        "customer purchase today",
+        "customers bought today",
+        "customer bought today",
+        "customers shopped today",
+        "customer shopped today",
+        "users purchased today",
+        "users bought today",
+        "how many customers purchased",
+        "how many customers bought",
+        "how many customers shopped",
+        "how many users purchased",
+    ]
+
+    is_customer_purchase_count = (
+        any(
+            phrase in clean_question
+            for phrase in customer_purchase_phrases
+        )
+        and (
+            "today" in clean_question
+            or "todays" in clean_question
+            or "today's" in normalized_question
+        )
+    )
+
+    if is_customer_purchase_count:
+
+        today = timezone.localdate()
+
+        customer_count = (
+            Order.objects
+            .filter(
+                created_at__date=today,
+                user__isnull=False
+            )
+            .values("user_id")
+            .distinct()
+            .count()
+        )
+
+        return JsonResponse({
+            "success": True,
+            "type": "shopping_statistics",
+            "answer": (
+                f"Today, **{customer_count} unique "
+                f"customer(s)** placed orders."
+            ),
+            "products": [],
+        })
+
+     # ============================================================
+     # SPECIFIC PRODUCT COUNT / AVAILABILITY QUESTIONS
+     # ============================================================
+
+    is_count_question = (
+         "how many" in clean_question
+         or "howmany" in clean_question
+         or "count" in clean_question
+         or "number of" in clean_question
+         or "total" in clean_question
+    )
+
+    if is_count_question:
+       for product in product_data:
+         product_name = str(product.get("name") or "").strip().lower()
+
+         if not product_name:
+            continue
+
+         # Match the complete product name in the question.
+         name_pattern = (
+            r"\b"
+            + re.escape(product_name).replace(r"\ ", r"\s+")
+            + r"\b"
+        )
+
+         if re.search(name_pattern, clean_question):
+            stock_quantity = int(product.get("inventory") or 0)
+
+            answer = (
+                f"There are **{stock_quantity} units of "
+                f"{product.get('name')}** in our inventory."
+            )
+
+            return JsonResponse({
+                "success": True,
+                "answer": answer,
+                "products": [make_product_card(product)],
+            })
+
+
+    # ============================================================
+    # 4B. CATEGORY PRODUCT COUNT QUESTIONS
+    # ============================================================
+
+    count_intent = (
+        "how many" in clean_question
+        or "howmany" in clean_question
+        or "count" in clean_question
+        or "number of" in clean_question
+        or "total" in clean_question
+    )
+
+    # Do not treat sales or stock questions as catalog-count questions.
+    is_sales_or_stock_count = (
+        "sold" in clean_question
+        or "sales" in clean_question
+        or "out of stock" in clean_question
+        or "stock" in clean_question
+        or "inventory" in clean_question
+    )
+
+    if count_intent and not is_sales_or_stock_count:
+        category_patterns = [
+            ("backpack", r"\bbackpacks?\b"),
+            ("handbag", r"\bhandbags?\b"),
+            ("clutch", r"\bclutches?\b|\bclutch\b"),
+            ("shoe", r"\bshoes?\b|\bsneakers?\b|\bfootwear\b"),
+            ("keyboard", r"\bkeyboards?\b"),
+            ("phone", r"\bphones?\b|\bsmartphones?\b|\bmobile\b"),
+            ("bag", r"\bbags?\b"),
+            ("electronics", r"\belectronics\b"),
+        ]
+
+        requested_category = None
+
+        for category_name, pattern in category_patterns:
+            if re.search(pattern, clean_question):
+                requested_category = category_name
+                break
+
+        if requested_category:
+            matching_products = []
+
+            for product in product_data:
+                # Use product identity/category fields, not the full
+                # description, to avoid unrelated product-card matches.
+                product_text = " ".join([
+                    str(product.get("name") or ""),
+                    str(product.get("category") or ""),
+                    str(product.get("subcategory") or ""),
+                    str(product.get("ai_product_type") or ""),
+                    str(product.get("ai_category") or ""),
+                    str(product.get("ai_subcategory") or ""),
+                ]).lower()
+
+                if requested_category == "backpack":
+                    matches = bool(re.search(r"\bbackpacks?\b", product_text))
+                elif requested_category == "handbag":
+                    matches = bool(re.search(
+                        r"\bhandbags?\b|\bpurses?\b|\bshoulder bag\b|\bleather bag\b",
+                        product_text
+                    ))
+                elif requested_category == "clutch":
+                    matches = bool(re.search(r"\bclutches?\b", product_text))
+                elif requested_category == "shoe":
+                    matches = bool(re.search(
+                        r"\bshoes?\b|\bsneakers?\b|\bfootwear\b",
+                        product_text
+                    ))
+                elif requested_category == "keyboard":
+                    matches = bool(re.search(r"\bkeyboards?\b", product_text))
+                elif requested_category == "phone":
+                    matches = bool(re.search(
+                        r"\bphones?\b|\bsmartphones?\b|\bmobile\b",
+                        product_text
+                    ))
+                elif requested_category == "bag":
+                    matches = bool(re.search(
+                        r"\bbags?\b|\bbackpacks?\b|\bhandbags?\b|\bclutches?\b|\bpurses?\b",
+                        product_text
+                    ))
+                else:
+                    matches = "electronics" in product_text
+
+                if matches:
+                    matching_products.append(product)
+
+            category_count = len(matching_products)
+            category_label = {
+                "backpack": "backpack",
+                "handbag": "handbag",
+                "clutch": "clutch",
+                "shoe": "shoe",
+                "keyboard": "keyboard",
+                "phone": "phone",
+                "bag": "bag",
+                "electronics": "electronics",
+            }.get(requested_category, requested_category)
+
+            if category_count == 1:
+                count_answer = (
+                    f"There is **1 {category_label} product** "
+                    "in our catalog."
+                )
+            else:
+                count_answer = (
+                    f"There are **{category_count} {category_label} "
+                    "products** in our catalog."
+                )
+
+            return JsonResponse({
+                "success": True,
+                "answer": count_answer,
+                "products": [
+                    make_product_card(product)
+                    for product in matching_products
+                ],
+            })
+
+
+    # ============================================================
+    # ORDER COUNT QUESTIONS
+    # ============================================================
+
+    order_count_phrases = [
+        "how many orders",
+        "howmany orders",
+        "total orders",
+        "number of orders",
+        "orders placed",
+        "orders have been placed",
+        "count orders",
+    ]
+
+    is_order_count_question = (
+        any(
+            phrase in clean_question
+            for phrase in order_count_phrases
+        )
+        and (
+            "order" in clean_question
+            or "orders" in clean_question
+        )
+        and not any(
+            word in clean_question
+            for word in [
+                "product",
+                "sold",
+                "sales",
+                "customer",
+                "user",
+                "track",
+                "status",
+                "cancel",
+                "deliver",
+            ]
+        )
+    )
+
+    if is_order_count_question:
+
+        total_orders = Order.objects.count()
+
+        return JsonResponse({
+            "success": True,
+            "type": "order_statistics",
+            "answer": (
+                f"A total of **{total_orders} orders** "
+                f"have been placed so far."
+            ),
+            "products": [],
+        })
+
+
+    # ============================================================
+    # 5. GREETING
     # ============================================================
 
     greeting_words = [
+
         "hi",
         "hello",
         "hey",
         "hai",
+
         "good morning",
         "good afternoon",
         "good evening",
@@ -1255,10 +2229,14 @@ def chatbot_api(request):
     if clean_question in greeting_words:
 
         return JsonResponse({
+
             "success": True,
+
             "answer": (
                 "Hello! 👋 Welcome to **Vetri AI**.\n\n"
+
                 "I can help you with:\n"
+
                 "• Product details\n"
                 "• Product comparison\n"
                 "• Recommendations\n"
@@ -1267,11 +2245,12 @@ def chatbot_api(request):
                 "• Order details\n"
                 "• Tracking details"
             ),
+
             "products": [],
         })
 
     # ============================================================
-    # 5. EXPLICIT PRODUCT NAME MATCHING
+    # 6. EXPLICIT PRODUCT NAME MATCHING
     # ============================================================
 
     exact_products = []
@@ -1279,7 +2258,10 @@ def chatbot_api(request):
     for product in product_data:
 
         product_name = (
-            product.get("name", "")
+            product.get(
+                "name",
+                ""
+            )
             or ""
         ).lower().strip()
 
@@ -1289,13 +2271,107 @@ def chatbot_api(request):
         if product_name in clean_question:
 
             if product not in exact_products:
-                exact_products.append(product)
+
+                exact_products.append(
+                    product
+                )
 
     # ============================================================
-    # 6. COMPARISON QUESTION
+    # 6A. CATEGORY-BASED PRODUCT DETAILS
+    # ============================================================
+    # Handle queries such as "keyboard product details" when the user
+    # mentions a product type instead of the full product name. Returning
+    # here prevents the Gemini fallback from attaching unrelated products.
+
+    detail_intent = any(
+        word in clean_question
+        for word in [
+            "detail", "details", "information", "info",
+            "price", "availability", "available", "in stock",
+            "show me", "tell me about"
+        ]
+    )
+
+    if not exact_products and detail_intent:
+        requested_detail_category = None
+
+        detail_category_patterns = [
+            ("keyboard", r"\bkeyboards?\b"),
+            ("backpack", r"\bbackpacks?\b"),
+            ("handbag", r"\bhandbags?\b"),
+            ("clutch", r"\bclutches?\b|\bclutch\b"),
+            ("shoe", r"\bshoes?\b|\bsneakers?\b|\bfootwear\b"),
+            ("phone", r"\bphones?\b|\bsmartphones?\b|\bmobile\b"),
+        ]
+
+        for category_name, pattern in detail_category_patterns:
+            if re.search(pattern, clean_question):
+                requested_detail_category = category_name
+                break
+
+        if requested_detail_category:
+            category_detail_products = []
+
+            for product in product_data:
+                product_identity = " ".join([
+                    str(product.get("name") or ""),
+                    str(product.get("category") or ""),
+                    str(product.get("subcategory") or ""),
+                    str(product.get("ai_product_type") or ""),
+                    str(product.get("ai_category") or ""),
+                    str(product.get("ai_subcategory") or ""),
+                ]).lower()
+
+                if requested_detail_category == "keyboard":
+                    matched = bool(re.search(r"\bkeyboards?\b", product_identity))
+                elif requested_detail_category == "backpack":
+                    matched = bool(re.search(r"\bbackpacks?\b", product_identity))
+                elif requested_detail_category == "handbag":
+                    matched = bool(re.search(r"\bhandbags?\b", product_identity))
+                elif requested_detail_category == "clutch":
+                    matched = bool(re.search(r"\bclutches?\b", product_identity))
+                elif requested_detail_category == "shoe":
+                    matched = bool(re.search(r"\bshoes?\b|\bsneakers?\b|\bfootwear\b", product_identity))
+                else:
+                    matched = bool(re.search(r"\bphones?\b|\bsmartphones?\b|\bmobile\b", product_identity))
+
+                if matched:
+                    category_detail_products.append(product)
+
+            if category_detail_products:
+                # For a singular product-type question, show only the first
+                # matching catalog product and its matching product card.
+                product = category_detail_products[0]
+                stock = int(product.get("inventory") or 0)
+
+                product_answer = (
+                    f"{product.get('name') or 'Product'}\n\n"
+                    f"Brand: {product.get('brand') or 'N/A'}\n"
+                    f"Price: ₹{float(product.get('price') or 0):,.2f}\n"
+                    f"Availability: {'In Stock' if stock > 0 else 'Out of Stock'} "
+                    f"({stock} units available)\n"
+                    f"Category: {product.get('category') or 'N/A'}\n"
+                    f"Subcategory: {product.get('subcategory') or 'N/A'}"
+                )
+
+                if product.get("description"):
+                    product_answer += f"\nDescription: {product.get('description')}"
+
+                return JsonResponse({
+                    "success": True,
+                    "type": "product_detail",
+                    "answer": product_answer,
+                    "products": [make_product_card(product)],
+                    "cart_url": f"/cart/add/{product.get('id')}/",
+                    "product_url": f"/products/{product.get('id')}/",
+                })
+
+    # ============================================================
+    # 7. COMPARISON QUESTION
     # ============================================================
 
     comparison_words = [
+
         "compare",
         "comparison",
         "difference",
@@ -1310,6 +2386,7 @@ def chatbot_api(request):
     )
 
     comparison_context_words = [
+
         "which",
         "best",
         "better",
@@ -1320,30 +2397,43 @@ def chatbot_api(request):
     ]
 
     comparison_with_context = (
+
         len(exact_products) >= 2
-        and any(
+
+        and
+
+        any(
             word in clean_question
             for word in comparison_context_words
         )
     )
 
-    if comparison_question or comparison_with_context:
+    if (
+        comparison_question
+        or comparison_with_context
+    ):
 
         if len(exact_products) < 2:
 
             return JsonResponse({
+
                 "success": True,
+
                 "answer": (
                     "I can compare two products for you. "
                     "Please mention both product names clearly.\n\n"
+
                     "Example:\n"
+
                     "**Compare Pink Shoulder Handbag "
                     "and Classic Grey Leather Handbag.**"
                 ),
+
                 "products": [],
             })
 
         first = exact_products[0]
+
         second = exact_products[1]
 
         first_price = float(
@@ -1367,31 +2457,35 @@ def chatbot_api(request):
         # --------------------------------------------------------
 
         first_score = 0
+
         second_score = 0
 
-        # Lower price
         if first_price < second_price:
+
             first_score += 2
 
         elif second_price < first_price:
+
             second_score += 2
 
-        # Better stock
         if first_stock > second_stock:
+
             first_score += 1
 
         elif second_stock > first_stock:
+
             second_score += 1
 
-        # Available
         if first_stock > 0:
+
             first_score += 2
 
         if second_stock > 0:
+
             second_score += 2
 
-        # Product quality information
         quality_words = [
+
             "premium",
             "quality",
             "durable",
@@ -1404,25 +2498,77 @@ def chatbot_api(request):
         ]
 
         first_text = " ".join([
-            str(first.get("description", "")),
-            str(first.get("ai_style", "")),
-            str(first.get("ai_use_case", "")),
-            str(first.get("ai_materials", "")),
+
+            str(
+                first.get(
+                    "description",
+                    ""
+                )
+            ),
+
+            str(
+                first.get(
+                    "ai_style",
+                    ""
+                )
+            ),
+
+            str(
+                first.get(
+                    "ai_use_case",
+                    ""
+                )
+            ),
+
+            str(
+                first.get(
+                    "ai_materials",
+                    ""
+                )
+            ),
+
         ]).lower()
 
         second_text = " ".join([
-            str(second.get("description", "")),
-            str(second.get("ai_style", "")),
-            str(second.get("ai_use_case", "")),
-            str(second.get("ai_materials", "")),
+
+            str(
+                second.get(
+                    "description",
+                    ""
+                )
+            ),
+
+            str(
+                second.get(
+                    "ai_style",
+                    ""
+                )
+            ),
+
+            str(
+                second.get(
+                    "ai_use_case",
+                    ""
+                )
+            ),
+
+            str(
+                second.get(
+                    "ai_materials",
+                    ""
+                )
+            ),
+
         ]).lower()
 
         for word in quality_words:
 
             if word in first_text:
+
                 first_score += 1
 
             if word in second_text:
+
                 second_score += 1
 
         # --------------------------------------------------------
@@ -1432,20 +2578,27 @@ def chatbot_api(request):
         if first_score > second_score:
 
             winner = first
+
             loser = second
 
         elif second_score > first_score:
 
             winner = second
+
             loser = first
 
         else:
 
             if first_price <= second_price:
+
                 winner = first
+
                 loser = second
+
             else:
+
                 winner = second
+
                 loser = first
 
         # --------------------------------------------------------
@@ -1453,14 +2606,23 @@ def chatbot_api(request):
         # --------------------------------------------------------
 
         comparison_answer = (
+
             "### 🛍️ Product Comparison\n\n"
 
             f"**1. {first.get('name')}**\n"
-            f"- Brand: {first.get('brand') or 'N/A'}\n"
-            f"- Price: ₹{first_price:,.2f}\n"
-            f"- Stock: {first_stock} units\n"
+
+            f"- Brand: "
+            f"{first.get('brand') or 'N/A'}\n"
+
+            f"- Price: "
+            f"₹{first_price:,.2f}\n"
+
+            f"- Stock: "
+            f"{first_stock} units\n"
+
             f"- Category: "
             f"{first.get('category') or 'N/A'}\n"
+
             f"- Subcategory: "
             f"{first.get('subcategory') or 'N/A'}\n"
         )
@@ -1468,6 +2630,7 @@ def chatbot_api(request):
         if first.get("description"):
 
             comparison_answer += (
+
                 f"- Description: "
                 f"{first.get('description')}\n"
             )
@@ -1475,12 +2638,21 @@ def chatbot_api(request):
         comparison_answer += "\n"
 
         comparison_answer += (
+
             f"**2. {second.get('name')}**\n"
-            f"- Brand: {second.get('brand') or 'N/A'}\n"
-            f"- Price: ₹{second_price:,.2f}\n"
-            f"- Stock: {second_stock} units\n"
+
+            f"- Brand: "
+            f"{second.get('brand') or 'N/A'}\n"
+
+            f"- Price: "
+            f"₹{second_price:,.2f}\n"
+
+            f"- Stock: "
+            f"{second_stock} units\n"
+
             f"- Category: "
             f"{second.get('category') or 'N/A'}\n"
+
             f"- Subcategory: "
             f"{second.get('subcategory') or 'N/A'}\n"
         )
@@ -1488,6 +2660,7 @@ def chatbot_api(request):
         if second.get("description"):
 
             comparison_answer += (
+
                 f"- Description: "
                 f"{second.get('description')}\n"
             )
@@ -1495,6 +2668,7 @@ def chatbot_api(request):
         comparison_answer += "\n"
 
         comparison_answer += (
+
             "### 🏆 Better Choice\n\n"
 
             f"**{winner.get('name')}** is the better "
@@ -1502,9 +2676,14 @@ def chatbot_api(request):
             "product information in the current catalog.\n\n"
         )
 
-        if winner.get("price", 0) < loser.get("price", 0):
+        if (
+            winner.get("price", 0)
+            <
+            loser.get("price", 0)
+        ):
 
             comparison_answer += (
+
                 f"💰 It is more affordable at "
                 f"₹{float(winner.get('price') or 0):,.2f}, "
                 f"compared with "
@@ -1519,6 +2698,7 @@ def chatbot_api(request):
         ):
 
             comparison_answer += (
+
                 f"📦 It also has better availability "
                 f"with {winner.get('inventory')} "
                 "units in stock.\n\n"
@@ -1527,11 +2707,13 @@ def chatbot_api(request):
         if winner.get("description"):
 
             comparison_answer += (
+
                 f"⭐ **Why:** "
                 f"{winner.get('description')}\n\n"
             )
 
         comparison_answer += (
+
             "You can use the **Add to Cart** button "
             "on the product card to purchase your choice."
         )
@@ -1543,17 +2725,21 @@ def chatbot_api(request):
             "answer": comparison_answer,
 
             "products": [
+
                 make_product_card(first),
+
                 make_product_card(second),
             ],
 
-            "winner": make_product_card(winner),
+            "winner": make_product_card(
+                winner
+            ),
 
             "cart_url": "/cart/",
         })
 
     # ============================================================
-    # 7. HOW TO ADD PRODUCT TO CART
+    # 8. HOW TO ADD PRODUCT TO CART
     # ============================================================
 
     how_to_cart_phrases = [
@@ -1588,6 +2774,7 @@ def chatbot_api(request):
             "success": True,
 
             "answer": (
+
                 "🛒 **How to Add a Product to Your Cart**\n\n"
 
                 "1. Search for the product you want.\n"
@@ -1605,10 +2792,11 @@ def chatbot_api(request):
         })
 
     # ============================================================
-    # 8. ADD PRODUCT TO CART
+    # 9. ADD PRODUCT TO CART
     # ============================================================
 
     add_words = [
+
         "add",
         "buy",
         "purchase",
@@ -1617,14 +2805,24 @@ def chatbot_api(request):
     ]
 
     cart_words = [
+
         "cart",
         "basket",
     ]
 
     is_add_to_cart = (
-        any(word in clean_question for word in add_words)
+
+        any(
+            word in clean_question
+            for word in add_words
+        )
+
         and
-        any(word in clean_question for word in cart_words)
+
+        any(
+            word in clean_question
+            for word in cart_words
+        )
     )
 
     if is_add_to_cart:
@@ -1647,23 +2845,33 @@ def chatbot_api(request):
 
         matched_product = None
 
-        # Exact product match first
         for product in product_data:
 
             product_name = (
-                product.get("name", "")
+
+                product.get(
+                    "name",
+                    ""
+                )
+
                 or ""
+
             ).lower().strip()
 
             if (
+
                 product_name
-                and product_name in clean_question
+
+                and
+
+                product_name in clean_question
+
             ):
 
                 matched_product = product
+
                 break
 
-        # Token-based fallback
         if not matched_product:
 
             best_score = 0
@@ -1675,8 +2883,14 @@ def chatbot_api(request):
             for product in product_data:
 
                 product_name = (
-                    product.get("name", "")
+
+                    product.get(
+                        "name",
+                        ""
+                    )
+
                     or ""
+
                 ).lower()
 
                 product_words = set(
@@ -1692,6 +2906,7 @@ def chatbot_api(request):
                 if score > best_score:
 
                     best_score = score
+
                     matched_product = product
 
         if not matched_product:
@@ -1709,7 +2924,9 @@ def chatbot_api(request):
             })
 
         inventory = int(
-            matched_product.get("inventory") or 0
+            matched_product.get(
+                "inventory"
+            ) or 0
         )
 
         if inventory <= 0:
@@ -1719,28 +2936,39 @@ def chatbot_api(request):
                 "success": True,
 
                 "answer": (
-                    f"Sorry, **{matched_product.get('name')}** "
+
+                    f"Sorry, "
+                    f"**{matched_product.get('name')}** "
                     "is currently out of stock."
                 ),
 
                 "products": [
-                    make_product_card(matched_product)
+
+                    make_product_card(
+                        matched_product
+                    )
                 ],
             })
 
-        user_cart, created = Cart.objects.get_or_create(
-            user=request.user
+        user_cart, created = (
+            Cart.objects.get_or_create(
+                user=request.user
+            )
         )
 
-        cart_item, created = CartItem.objects.get_or_create(
+        cart_item, created = (
+            CartItem.objects.get_or_create(
 
-            cart=user_cart,
+                cart=user_cart,
 
-            product_id=matched_product.get("id"),
+                product_id=(
+                    matched_product.get("id")
+                ),
 
-            defaults={
-                "quantity": 1
-            }
+                defaults={
+                    "quantity": 1
+                }
+            )
         )
 
         if not created:
@@ -1748,6 +2976,7 @@ def chatbot_api(request):
             if cart_item.quantity < inventory:
 
                 cart_item.quantity += 1
+
                 cart_item.save()
 
             else:
@@ -1757,6 +2986,7 @@ def chatbot_api(request):
                     "success": True,
 
                     "answer": (
+
                         f"You already have the maximum "
                         f"available quantity of "
                         f"**{matched_product.get('name')}** "
@@ -1764,6 +2994,7 @@ def chatbot_api(request):
                     ),
 
                     "products": [
+
                         make_product_card(
                             matched_product
                         )
@@ -1777,12 +3008,15 @@ def chatbot_api(request):
             "success": True,
 
             "answer": (
+
                 f"🛒 **{matched_product.get('name')}** "
                 "has been added to your cart successfully.\n\n"
+
                 "You can continue shopping or open your cart."
             ),
 
             "products": [
+
                 make_product_card(
                     matched_product
                 )
@@ -1792,7 +3026,7 @@ def chatbot_api(request):
         })
 
     # ============================================================
-    # 9. GET USER CART DATA
+    # 10. GET USER CART DATA
     # ============================================================
 
     cart_data = []
@@ -1806,8 +3040,13 @@ def chatbot_api(request):
         if user_cart:
 
             cart_items = (
+
                 CartItem.objects
-                .filter(cart=user_cart)
+
+                .filter(
+                    cart=user_cart
+                )
+
                 .select_related("product")
             )
 
@@ -1819,7 +3058,9 @@ def chatbot_api(request):
 
                     "name": item.product.name,
 
-                    "brand": item.product.brand or "",
+                    "brand": (
+                        item.product.brand or ""
+                    ),
 
                     "quantity": item.quantity,
 
@@ -1837,7 +3078,7 @@ def chatbot_api(request):
                 })
 
     # ============================================================
-    # 10. TRACKING DETAILS
+    # 11. TRACKING DETAILS
     # ============================================================
 
     tracking_phrases = [
@@ -1894,13 +3135,21 @@ def chatbot_api(request):
             })
 
         orders = (
+
             Order.objects
-            .filter(user=request.user)
+
+            .filter(
+                user=request.user
+            )
+
             .prefetch_related(
                 "items__product",
                 "tracking_updates"
             )
-            .order_by("-created_at")[:20]
+
+            .order_by(
+                "-created_at"
+            )[:20]
         )
 
         order_data = []
@@ -1909,7 +3158,9 @@ def chatbot_api(request):
 
             tracking_updates = []
 
-            for update in order.tracking_updates.all():
+            for update in (
+                order.tracking_updates.all()
+            ):
 
                 tracking_updates.append({
 
@@ -1928,10 +3179,13 @@ def chatbot_api(request):
                     ),
 
                     "created_at": (
+
                         update.created_at.strftime(
                             "%d-%m-%Y %I:%M %p"
                         )
+
                         if update.created_at
+
                         else ""
                     ),
                 })
@@ -1940,7 +3194,9 @@ def chatbot_api(request):
 
                 "id": order.id,
 
-                "order_number": order.order_number,
+                "order_number": (
+                    order.order_number
+                ),
 
                 "status": order.status,
 
@@ -1968,11 +3224,16 @@ def chatbot_api(request):
                     order.courier_name or ""
                 ),
 
-                "estimated_delivery": order.estimated_delivery.strftime(
-                    "%d-%m-%Y"
-                )
-                if order.estimated_delivery
-                else "",
+                "estimated_delivery": (
+
+                    order.estimated_delivery.strftime(
+                        "%d-%m-%Y"
+                    )
+
+                    if order.estimated_delivery
+
+                    else ""
+                ),
 
                 "tracking_updates": tracking_updates,
             })
@@ -2010,6 +3271,7 @@ def chatbot_api(request):
             if order.get("tracking_number"):
 
                 tracking_answer += (
+
                     f"**Tracking Number:** "
                     f"{order.get('tracking_number')}\n"
                 )
@@ -2017,6 +3279,7 @@ def chatbot_api(request):
             if order.get("courier_name"):
 
                 tracking_answer += (
+
                     f"**Courier:** "
                     f"{order.get('courier_name')}\n"
                 )
@@ -2024,6 +3287,7 @@ def chatbot_api(request):
             if order.get("estimated_delivery"):
 
                 tracking_answer += (
+
                     f"**Estimated Delivery:** "
                     f"{order.get('estimated_delivery')}\n"
                 )
@@ -2039,12 +3303,16 @@ def chatbot_api(request):
                 ]:
 
                     tracking_answer += (
-                        f"• **{update.get('status_display')}**"
+
+                        f"• **"
+                        f"{update.get('status_display')}"
+                        f"**"
                     )
 
                     if update.get("description"):
 
                         tracking_answer += (
+
                             f" — "
                             f"{update.get('description')}"
                         )
@@ -2052,6 +3320,7 @@ def chatbot_api(request):
                     if update.get("location"):
 
                         tracking_answer += (
+
                             f" | "
                             f"{update.get('location')}"
                         )
@@ -2059,6 +3328,7 @@ def chatbot_api(request):
                     if update.get("created_at"):
 
                         tracking_answer += (
+
                             f"\n  "
                             f"{update.get('created_at')}"
                         )
@@ -2079,7 +3349,7 @@ def chatbot_api(request):
         })
 
     # ============================================================
-    # 11. CART DETAILS
+    # 12. CART DETAILS
     # ============================================================
 
     cart_phrases = [
@@ -2129,6 +3399,7 @@ def chatbot_api(request):
 
                 "answer": (
                     "🛒 Your cart is currently empty.\n\n"
+
                     "You can ask me about a product "
                     "and add it to your cart."
                 ),
@@ -2170,6 +3441,7 @@ def chatbot_api(request):
             )
 
         cart_answer += (
+
             f"### 💰 Cart Total: "
             f"₹{cart_total:,.2f}\n\n"
 
@@ -2191,7 +3463,7 @@ def chatbot_api(request):
         })
 
     # ============================================================
-    # 12. GET USER ORDER DATA
+    # 13. GET USER ORDER DATA
     # ============================================================
 
     order_data = []
@@ -2199,13 +3471,21 @@ def chatbot_api(request):
     if request.user.is_authenticated:
 
         orders = (
+
             Order.objects
-            .filter(user=request.user)
+
+            .filter(
+                user=request.user
+            )
+
             .prefetch_related(
                 "items__product",
                 "tracking_updates"
             )
-            .order_by("-created_at")[:20]
+
+            .order_by(
+                "-created_at"
+            )[:20]
         )
 
         for order in orders:
@@ -2270,18 +3550,24 @@ def chatbot_api(request):
                 ),
 
                 "estimated_delivery": (
+
                     order.estimated_delivery.strftime(
                         "%d-%m-%Y"
                     )
+
                     if order.estimated_delivery
+
                     else ""
                 ),
 
                 "created_at": (
+
                     order.created_at.strftime(
                         "%d-%m-%Y %I:%M %p"
                     )
+
                     if order.created_at
+
                     else ""
                 ),
 
@@ -2289,7 +3575,7 @@ def chatbot_api(request):
             })
 
     # ============================================================
-    # 13. ORDER DETAILS
+    # 14. ORDER DETAILS
     # ============================================================
 
     order_phrases = [
@@ -2394,7 +3680,7 @@ def chatbot_api(request):
         })
 
     # ============================================================
-    # 14. PRODUCT INFORMATION
+    # 15. PRODUCT INFORMATION
     # ============================================================
 
     if len(exact_products) == 1:
@@ -2402,6 +3688,7 @@ def chatbot_api(request):
         product = exact_products[0]
 
         product_answer = (
+
             f"### 🛍️ {product.get('name')}\n\n"
 
             f"**Brand:** "
@@ -2423,11 +3710,13 @@ def chatbot_api(request):
         if product.get("description"):
 
             product_answer += (
+
                 f"**Description:** "
                 f"{product.get('description')}\n\n"
             )
 
         product_answer += (
+
             "You can view the product and "
             "add it to your cart using the "
             "product card below."
@@ -2440,20 +3729,25 @@ def chatbot_api(request):
             "answer": product_answer,
 
             "products": [
-                make_product_card(product)
+
+                make_product_card(
+                    product
+                )
             ],
 
             "cart_url": (
-                f"/cart/add/{product.get('id')}/"
+                f"/cart/add/"
+                f"{product.get('id')}/"
             ),
 
             "product_url": (
-                f"/products/{product.get('id')}/"
+                f"/products/"
+                f"{product.get('id')}/"
             ),
         })
 
     # ============================================================
-    # 15. RECOMMENDATION
+    # 16. RECOMMENDATION
     # ============================================================
 
     recommendation_words = [
@@ -2500,12 +3794,6 @@ def chatbot_api(request):
         )
     )
 
-    # IMPORTANT:
-    # This section comes AFTER comparison.
-    # Therefore:
-    # "which handbag is best, A and B"
-    # is already handled above.
-
     if is_recommendation:
 
         recommendation_products = []
@@ -2514,23 +3802,68 @@ def chatbot_api(request):
 
             search_text = " ".join([
 
-                str(product.get("name", "")),
+                str(
+                    product.get(
+                        "name",
+                        ""
+                    )
+                ),
 
-                str(product.get("brand", "")),
+                str(
+                    product.get(
+                        "brand",
+                        ""
+                    )
+                ),
 
-                str(product.get("category", "")),
+                str(
+                    product.get(
+                        "category",
+                        ""
+                    )
+                ),
 
-                str(product.get("subcategory", "")),
+                str(
+                    product.get(
+                        "subcategory",
+                        ""
+                    )
+                ),
 
-                str(product.get("description", "")),
+                str(
+                    product.get(
+                        "description",
+                        ""
+                    )
+                ),
 
-                str(product.get("ai_product_type", "")),
+                str(
+                    product.get(
+                        "ai_product_type",
+                        ""
+                    )
+                ),
 
-                str(product.get("ai_style", "")),
+                str(
+                    product.get(
+                        "ai_style",
+                        ""
+                    )
+                ),
 
-                str(product.get("ai_use_case", "")),
+                str(
+                    product.get(
+                        "ai_use_case",
+                        ""
+                    )
+                ),
 
-                str(product.get("ai_materials", "")),
+                str(
+                    product.get(
+                        "ai_materials",
+                        ""
+                    )
+                ),
 
             ]).lower()
 
@@ -2550,7 +3883,10 @@ def chatbot_api(request):
                 search_words
             )
 
-            if product.get("inventory", 0) > 0:
+            if product.get(
+                "inventory",
+                0
+            ) > 0:
 
                 score += 2
 
@@ -2571,7 +3907,6 @@ def chatbot_api(request):
             item[1]
 
             for item in recommendation_products[:3]
-
         ]
 
         if top_products:
@@ -2597,6 +3932,7 @@ def chatbot_api(request):
                 )
 
             recommendation_answer += (
+
                 "You can use the **Add to Cart** "
                 "button on the product cards."
             )
@@ -2608,7 +3944,11 @@ def chatbot_api(request):
                 "answer": recommendation_answer,
 
                 "products": [
-                    make_product_card(product)
+
+                    make_product_card(
+                        product
+                    )
+
                     for product in top_products
                 ],
 
@@ -2616,57 +3956,480 @@ def chatbot_api(request):
             })
 
     # ============================================================
-    # 16. AVAILABLE PRODUCTS
+    # 17. CATEGORY PRODUCT COUNT
+    # ============================================================
+
+    category_count_phrases = [
+
+        "how many products are available",
+        "how many product are available",
+        "how many products are currently available",
+        "how many product are currently available",
+
+        "how many products do you have",
+        "how many product do you have",
+
+        "number of products available",
+        "number of product available",
+
+        "count of products available",
+        "count of product available",
+
+        "total products available",
+
+        "how many products are in stock",
+        "how many product are in stock",
+
+        "how many products currently in stock",
+        "how many product currently in stock",
+    ]
+
+    is_category_count_question = any(
+
+        phrase in clean_question
+
+        for phrase in category_count_phrases
+    )
+
+    category_count_words = [
+
+        "handbag",
+        "handbags",
+
+        "bag",
+        "bags",
+
+        "backpack",
+        "backpacks",
+
+        "clutch",
+        "clutches",
+
+        "shoe",
+        "shoes",
+        "footwear",
+
+        "phone",
+        "phones",
+        "mobile",
+
+        "keyboard",
+        "keyboards",
+
+        "electronics",
+    ]
+
+    has_category_count_pattern = (
+
+        (
+            "how many" in clean_question
+
+            or
+
+            "number of" in clean_question
+
+            or
+
+            "count of" in clean_question
+
+            or
+
+            "total" in clean_question
+        )
+
+        and
+
+        (
+            "available" in clean_question
+
+            or
+
+            "in stock" in clean_question
+
+            or
+
+            "currently available" in clean_question
+        )
+
+        and
+
+        any(
+            keyword in clean_question
+            for keyword in category_count_words
+        )
+    )
+
+    if (
+        is_category_count_question
+        or has_category_count_pattern
+    ):
+
+        requested_category = None
+
+        for keyword in category_count_words:
+
+            if keyword in clean_question:
+
+                requested_category = keyword
+
+                break
+
+        matching_products = []
+
+        for product in product_data:
+
+            inventory = int(
+                product.get(
+                    "inventory"
+                ) or 0
+            )
+
+            if inventory <= 0:
+                continue
+
+            product_text = " ".join([
+
+                str(
+                    product.get(
+                        "name",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "category",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "subcategory",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "description",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "ai_product_type",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "ai_category",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "ai_subcategory",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "keywords",
+                        ""
+                    )
+                ),
+
+                str(
+                    product.get(
+                        "search_phrases",
+                        ""
+                    )
+                ),
+
+            ]).lower()
+
+            if requested_category in [
+                "backpack",
+                "backpacks",
+            ]:
+
+                if "backpack" not in product_text:
+                    continue
+
+            elif requested_category in [
+                "handbag",
+                "handbags",
+            ]:
+
+                handbag_words = [
+
+                    "handbag",
+                    "handbags",
+                    "purse",
+                    "shoulder bag",
+                    "leather bag",
+                    "women bag",
+                ]
+
+                if not any(
+                    word in product_text
+                    for word in handbag_words
+                ):
+
+                    continue
+
+            elif requested_category in [
+                "bag",
+                "bags",
+            ]:
+
+                if not any(
+                    word in product_text
+                    for word in [
+                        "bag",
+                        "backpack",
+                        "handbag",
+                        "clutch",
+                    ]
+                ):
+
+                    continue
+
+            elif requested_category in [
+                "shoe",
+                "shoes",
+                "footwear",
+            ]:
+
+                if not any(
+                    word in product_text
+                    for word in [
+                        "shoe",
+                        "shoes",
+                        "footwear",
+                        "sneaker",
+                    ]
+                ):
+
+                    continue
+
+            elif requested_category in [
+                "phone",
+                "phones",
+                "mobile",
+            ]:
+
+                if not any(
+                    word in product_text
+                    for word in [
+                        "phone",
+                        "smartphone",
+                        "mobile",
+                    ]
+                ):
+
+                    continue
+
+            elif requested_category in [
+                "keyboard",
+                "keyboards",
+            ]:
+
+                if "keyboard" not in product_text:
+                    continue
+
+            elif requested_category == "electronics":
+
+                if "electronics" not in product_text:
+                    continue
+
+            else:
+
+                if (
+                    requested_category
+
+                    and
+
+                    requested_category
+                    not in product_text
+                ):
+
+                    continue
+
+            matching_products.append(
+                product
+            )
+
+        product_count = len(
+            matching_products
+        )
+
+        if requested_category in [
+            "backpack",
+            "backpacks",
+        ]:
+
+            category_display = "backpack"
+
+        elif requested_category in [
+            "handbag",
+            "handbags",
+        ]:
+
+            category_display = "handbag"
+
+        elif requested_category in [
+            "shoe",
+            "shoes",
+        ]:
+
+            category_display = "shoe"
+
+        elif requested_category:
+
+            category_display = requested_category
+
+        else:
+
+            category_display = "product"
+
+        if product_count == 0:
+
+            category_count_answer = (
+
+                f"There are currently **0 "
+                f"{category_display} products** available."
+            )
+
+        elif product_count == 1:
+
+            category_count_answer = (
+
+                f"There is currently **1 "
+                f"{category_display} product** available:\n\n"
+            )
+
+        else:
+
+            category_count_answer = (
+
+                f"There are currently **{product_count} "
+                f"{category_display} products** available:\n\n"
+            )
+
+        for index, product in enumerate(
+
+            matching_products,
+
+            start=1
+        ):
+
+            category_count_answer += (
+
+                f"**{index}. "
+                f"{product.get('name')}**\n"
+
+                f"- Brand: "
+                f"{product.get('brand') or 'N/A'}\n"
+
+                f"- Price: "
+                f"₹{float(product.get('price') or 0):,.2f}\n"
+
+                f"- Stock: "
+                f"{product.get('inventory', 0)} "
+                "units available\n\n"
+            )
+
+        return JsonResponse({
+
+            "success": True,
+
+            "answer": category_count_answer,
+
+            "products": [
+
+                make_product_card(
+                    product
+                )
+
+                for product in matching_products
+            ],
+
+            "cart_url": "/cart/",
+        })
+
+    # ============================================================
+    # 18. AVAILABLE PRODUCTS
     # ============================================================
 
     available_product_phrases = [
+
         "available products",
         "available product",
+
         "products available",
         "product available",
+
         "show available products",
         "show available product",
+
         "list available products",
         "list available product",
+
         "what products are available",
         "what product are available",
+
         "what products do you have",
         "what product do you have",
+
         "show me products",
         "show products",
+
         "list products",
     ]
 
     is_available_products = any(
+
         phrase in clean_question
+
         for phrase in available_product_phrases
     )
 
     if is_available_products:
 
-        # --------------------------------------------------------
-        # CHECK WHETHER USER REQUESTED A PRODUCT CATEGORY
-        # --------------------------------------------------------
-
         category_products = []
 
         category_keywords = [
+
             "handbag",
             "handbags",
+
             "bag",
             "bags",
+
             "backpack",
             "backpacks",
+
             "clutch",
             "clutches",
+
             "shoe",
             "shoes",
             "footwear",
+
             "phone",
             "phones",
             "mobile",
+
             "keyboard",
             "keyboards",
+
             "electronics",
         ]
 
@@ -2677,57 +4440,96 @@ def chatbot_api(request):
             if keyword in clean_question:
 
                 requested_category = keyword
-                break
 
-        # --------------------------------------------------------
-        # FIND AVAILABLE PRODUCTS
-        # --------------------------------------------------------
+                break
 
         for product in product_data:
 
             inventory = int(
-                product.get("inventory") or 0
+                product.get(
+                    "inventory"
+                ) or 0
             )
 
-            # Only products currently in stock
             if inventory <= 0:
                 continue
-
-            # ----------------------------------------------------
-            # CATEGORY FILTER
-            # ----------------------------------------------------
 
             if requested_category:
 
                 product_text = " ".join([
 
-                    str(product.get("name", "")),
+                    str(
+                        product.get(
+                            "name",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("category", "")),
+                    str(
+                        product.get(
+                            "category",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("subcategory", "")),
+                    str(
+                        product.get(
+                            "subcategory",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("description", "")),
+                    str(
+                        product.get(
+                            "description",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("ai_product_type", "")),
+                    str(
+                        product.get(
+                            "ai_product_type",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("ai_category", "")),
+                    str(
+                        product.get(
+                            "ai_category",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("ai_subcategory", "")),
+                    str(
+                        product.get(
+                            "ai_subcategory",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("keywords", "")),
+                    str(
+                        product.get(
+                            "keywords",
+                            ""
+                        )
+                    ),
 
-                    str(product.get("search_phrases", "")),
+                    str(
+                        product.get(
+                            "search_phrases",
+                            ""
+                        )
+                    ),
 
                 ]).lower()
 
-                # Special handling for bags / handbags
                 if requested_category in [
                     "handbag",
                     "handbags",
                 ]:
 
                     handbag_words = [
+
                         "handbag",
                         "handbags",
                         "purse",
@@ -2740,54 +4542,105 @@ def chatbot_api(request):
                         word in product_text
                         for word in handbag_words
                     ):
+
                         continue
 
-                # General category matching
+                elif requested_category in [
+                    "bag",
+                    "bags",
+                ]:
+
+                    if not any(
+                        word in product_text
+                        for word in [
+                            "bag",
+                            "backpack",
+                            "handbag",
+                            "clutch",
+                        ]
+                    ):
+
+                        continue
+
+                elif requested_category in [
+                    "shoe",
+                    "shoes",
+                    "footwear",
+                ]:
+
+                    if not any(
+                        word in product_text
+                        for word in [
+                            "shoe",
+                            "shoes",
+                            "footwear",
+                            "sneaker",
+                        ]
+                    ):
+
+                        continue
+
+                elif requested_category in [
+                    "phone",
+                    "phones",
+                    "mobile",
+                ]:
+
+                    if not any(
+                        word in product_text
+                        for word in [
+                            "phone",
+                            "smartphone",
+                            "mobile",
+                        ]
+                    ):
+
+                        continue
+
+                elif requested_category in [
+                    "keyboard",
+                    "keyboards",
+                ]:
+
+                    if "keyboard" not in product_text:
+                        continue
+
+                elif requested_category == "electronics":
+
+                    if "electronics" not in product_text:
+                        continue
+
                 elif requested_category not in product_text:
 
                     continue
 
-            category_products.append(product)
-
-        # --------------------------------------------------------
-        # RESPONSE
-        # --------------------------------------------------------
+            category_products.append(
+                product
+            )
 
         if category_products:
 
-            available_answer = (
-                "### 🛍️ Available Products\n\n"
-            )
+            # Use plain text here so the frontend cannot display
+            # escaped Markdown characters such as \\### or \\**.
+            available_answer = "🛍️ Available Products\n\n"
 
             if requested_category in [
                 "handbag",
                 "handbags",
             ]:
-
-                available_answer = (
-                    "### 👜 Available Handbags\n\n"
-                )
+                available_answer = "👜 Available Handbags\n\n"
 
             for product in category_products:
-
                 available_answer += (
-
-                    f"**{product.get('name')}**\n"
-
-                    f"- Brand: "
-                    f"{product.get('brand') or 'N/A'}\n"
-
-                    f"- Price: "
-                    f"₹{float(product.get('price') or 0):,.2f}\n"
-
-                    f"- Stock: "
-                    f"{product.get('inventory', 0)} available\n\n"
+                    f"{product.get('name')}\n"
+                    f"Brand: {product.get('brand') or 'N/A'}\n"
+                    f"Price: ₹{float(product.get('price') or 0):,.2f}\n"
+                    f"Stock: {product.get('inventory', 0)} available\n\n"
                 )
 
             available_answer += (
-                "You can view the product details or "
-                "use the **Add to Cart** button on "
-                "the product cards."
+                "You can view the product details or use the "
+                "Add to Cart button on the product cards."
             )
 
             return JsonResponse({
@@ -2797,14 +4650,17 @@ def chatbot_api(request):
                 "answer": available_answer,
 
                 "products": [
-                    make_product_card(product)
+
+                    make_product_card(
+                        product
+                    )
+
                     for product in category_products
                 ],
 
                 "cart_url": "/cart/",
             })
 
-        # No matching available products
         return JsonResponse({
 
             "success": True,
@@ -2818,7 +4674,103 @@ def chatbot_api(request):
         })
 
     # ============================================================
-    # 17. GEMINI FALLBACK
+    # 19. OUT OF STOCK PRODUCT COUNT
+    # ============================================================
+
+    out_of_stock_phrases = [
+
+        "how many products are out of stock",
+        "how many product are out of stock",
+
+        "how many products are currently out of stock",
+        "how many product are currently out of stock",
+
+        "number of products out of stock",
+        "number of product out of stock",
+
+        "count of products out of stock",
+        "count of product out of stock",
+
+        "how many products are unavailable",
+        "how many product are unavailable",
+
+        "how many products have no stock",
+
+        "how many products have zero stock",
+
+        "how many products have 0 stock",
+
+        "out of stock products count",
+        "out of stock product count",
+
+        "total out of stock products",
+
+        "total products out of stock",
+
+        "howmany products are out of stock",
+
+        "howmany products are currently out of stock",
+    ]
+
+    is_out_of_stock_count = any(
+
+        phrase in clean_question
+
+        for phrase in out_of_stock_phrases
+    )
+
+    if is_out_of_stock_count:
+
+        out_of_stock_count = (
+            Product.objects
+            .filter(
+                inventory__lte=0
+            )
+            .count()
+        )
+
+        if out_of_stock_count == 0:
+
+            out_of_stock_answer = (
+
+                "📦 **Out-of-Stock Products**\n\n"
+
+                "There are currently **0 products "
+                "out of stock**."
+            )
+
+        elif out_of_stock_count == 1:
+
+            out_of_stock_answer = (
+
+                "📦 **Out-of-Stock Products**\n\n"
+
+                "There is currently **1 product "
+                "out of stock**."
+            )
+
+        else:
+
+            out_of_stock_answer = (
+
+                "📦 **Out-of-Stock Products**\n\n"
+
+                f"There are currently "
+                f"**{out_of_stock_count} "
+                "products out of stock**."
+            )
+
+        return JsonResponse({
+
+            "success": True,
+
+            "answer": out_of_stock_answer,
+
+            "products": [],
+        })
+
+    # ============================================================
+    # 20. GEMINI FALLBACK
     # ============================================================
 
     try:
@@ -2834,10 +4786,6 @@ def chatbot_api(request):
                 "Empty AI response"
             )
 
-        # --------------------------------------------------------
-        # FIND PRODUCTS MENTIONED IN QUESTION / ANSWER
-        # --------------------------------------------------------
-
         response_products = []
 
         search_text = (
@@ -2847,24 +4795,34 @@ def chatbot_api(request):
         for product in product_data:
 
             product_name = (
+
                 product.get(
                     "name",
                     ""
                 )
+
                 or ""
+
             ).lower()
 
             brand = (
+
                 product.get(
                     "brand",
                     ""
                 )
+
                 or ""
+
             ).lower()
 
             if (
+
                 product_name
-                and product_name in search_text
+
+                and
+
+                product_name in search_text
             ):
 
                 if product not in response_products:
@@ -2876,16 +4834,21 @@ def chatbot_api(request):
                 continue
 
             if (
+
                 brand
-                and brand in search_text
-                and product not in response_products
+
+                and
+
+                brand in search_text
+
+                and
+
+                product not in response_products
             ):
 
-                response_products.append(product)
-
-        # --------------------------------------------------------
-        # RETURN GEMINI RESPONSE
-        # --------------------------------------------------------
+                response_products.append(
+                    product
+                )
 
         return JsonResponse({
 
@@ -2895,10 +4858,11 @@ def chatbot_api(request):
 
             "products": [
 
-                make_product_card(product)
+                make_product_card(
+                    product
+                )
 
                 for product in response_products[:5]
-
             ],
         })
 
@@ -2920,5 +4884,3 @@ def chatbot_api(request):
 
             "products": [],
         })
-
-

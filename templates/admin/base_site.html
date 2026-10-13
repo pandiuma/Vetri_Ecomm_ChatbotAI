@@ -1,0 +1,35 @@
+
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}Vetri AI Administration{% endblock %}
+
+{% block branding %}
+<div class="vetri-admin-brand">
+
+    <div class="vetri-admin-logo">
+        <i class="fas fa-robot"></i>
+    </div>
+
+    <div>
+        <div class="vetri-admin-title">
+            Vetri AI
+        </div>
+
+        <div class="vetri-admin-subtitle">
+            Ecommerce Intelligence
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<link rel="stylesheet"
+      href="{% static 'store/css/admin_custom.css' %}">
+{% endblock %}

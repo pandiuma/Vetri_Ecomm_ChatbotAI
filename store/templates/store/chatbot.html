@@ -1,4 +1,4 @@
-{% extends 'store/base.html' %}
+﻿{% extends 'store/base.html' %}
 
 {% load static %}
 
@@ -157,9 +157,13 @@
         }
 
 
+
         /* =========================================
-           FORMAT AI TEXT
-        ========================================= */
+              FORMAT AI TEXT
+              CLEAN VETRI AI PRODUCT RESPONSE
+        ======================================== */
+
+
 
         function formatAIText(text) {
 
@@ -167,72 +171,298 @@
                 return "";
             }
 
-            let safe =
-                escapeHtml(text);
+            /* =========================================
+               1. CONVERT RESPONSE TO STRING
+               ========================================= */
 
+            let safe = String(text);
 
-            /* Bold */
+            /* =========================================
+               2. NORMALIZE LINE BREAKS
+               ========================================= */
 
-            safe =
-                safe.replace(
-                    /\*\*(.*?)\*\*/g,
-                    "<strong>$1</strong>"
+            safe = safe.replace(/\r\n/g, "\n");
+            safe = safe.replace(/\r/g, "\n");
+
+            /* =========================================
+               3. REMOVE ESCAPED MARKDOWN CHARACTERS
+
+               Converts:
+               \###  â†’ ###
+               \*\*  â†’ **
+               \*    â†’ *
+               \_    â†’ _
+               ========================================= */
+
+            safe = safe.replace(/\\([#*_`])/g, "$1");
+
+            /* =========================================
+               4. AVAILABLE PRODUCTS / HANDBAGS
+               ========================================= */
+
+            const hasAvailableProducts =
+                safe.includes("### ðŸ›ï¸ Available Products") ||
+                safe.includes("### ðŸ‘œ Available Handbags") ||
+                safe.includes("ðŸ›ï¸ Available Products") ||
+                safe.includes("ðŸ‘œ Available Handbags");
+
+            if (hasAvailableProducts) {
+
+                let title = "ðŸ›ï¸ Available Products";
+
+                if (
+                    safe.includes("### ðŸ‘œ Available Handbags") ||
+                    safe.includes("ðŸ‘œ Available Handbags")
+                ) {
+                    title = "ðŸ‘œ Available Handbags";
+                }
+
+                /* =========================================
+                   REMOVE HEADING
+                   ========================================= */
+
+                safe = safe
+                    .replace(/###\s*ðŸ›ï¸\s*Available Products/g, "")
+                    .replace(/###\s*ðŸ‘œ\s*Available Handbags/g, "")
+                    .replace(/ðŸ›ï¸\s*Available Products/g, "")
+                    .replace(/ðŸ‘œ\s*Available Handbags/g, "")
+                    .trim();
+
+                /* =========================================
+                   REMOVE FOOTER
+                   ========================================= */
+
+                let footer = "";
+
+                const footerPattern =
+                    /You can view the product details or use the\s+\*\*Add to Cart\*\*\s+button on the product cards\.?/;
+
+                if (footerPattern.test(safe)) {
+
+                    footer =
+                        "You can view the product details or use the " +
+                        "<strong>Add to Cart</strong> button on the product cards.";
+
+                    safe = safe
+                        .replace(footerPattern, "")
+                        .trim();
+                }
+
+                /* =========================================
+                   NORMALIZE ONE-LINE PRODUCT RESPONSE
+
+                   Example:
+
+                   **Classic White Sneakers** - Brand: UrbanStep
+                   - Price: â‚¹2,499.00 - Stock: 30 available
+
+                   becomes separate lines.
+                   ========================================= */
+
+                safe = safe.replace(
+                    /\s+\*\*(?=[A-Z])/g,
+                    "\n**"
                 );
 
-
-            /* Headings */
-
-            safe =
-                safe.replace(
-                    /^### (.*)$/gm,
-                    "<h4>$1</h4>"
+                safe = safe.replace(
+                    /\s+-\s+Brand:/g,
+                    "\n- Brand:"
                 );
 
-            safe =
-                safe.replace(
-                    /^## (.*)$/gm,
-                    "<h3>$1</h3>"
+                safe = safe.replace(
+                    /\s+-\s+Price:/g,
+                    "\n- Price:"
                 );
 
-            safe =
-                safe.replace(
-                    /^# (.*)$/gm,
-                    "<h2>$1</h2>"
+                safe = safe.replace(
+                    /\s+-\s+Stock:/g,
+                    "\n- Stock:"
                 );
 
+                /* =========================================
+                   PRODUCT REGEX
+                   ========================================= */
 
-            /* Horizontal line */
+                const productPattern =
+                    /\*\*(.*?)\*\*\s*-\s*Brand:\s*(.*?)\s*-\s*Price:\s*â‚¹([\d,]+(?:\.\d+)?)\s*-\s*Stock:\s*([^\n]*?)(?=\s*\*\*|$)/gs;
 
-            safe =
-                safe.replace(
-                    /^---$/gm,
-                    "<hr>"
-                );
+                let productsHtml = "";
+                let match;
 
+                while (
+                    (match = productPattern.exec(safe)) !== null
+                ) {
 
-            /* Bullet points */
+                    const productName =
+                        escapeHtml(match[1].trim());
 
-            safe =
-                safe.replace(
-                    /^\s*[-*]\s+(.*)$/gm,
-                    "<li>$1</li>"
-                );
+                    const brand =
+                        escapeHtml(match[2].trim());
 
+                    const price =
+                        escapeHtml(match[3].trim());
 
-            safe =
-                safe.replace(
-                    /(<li>.*?<\/li>)/gs,
-                    "<ul>$1</ul>"
-                );
+                    const stock =
+                        escapeHtml(match[4].trim());
 
+                    productsHtml += `
+                <div class="ai-product-summary">
 
-            /* New lines */
+                    <div class="ai-product-summary-name">
+                        ${productName}
+                    </div>
 
-            safe =
-                safe.replace(
-                    /\n/g,
-                    "<br>"
-                );
+                    <div class="ai-product-summary-details">
+
+                        <div>
+                            <strong>Brand:</strong>
+                            ${brand}
+                        </div>
+
+                        <div>
+                            <strong>Price:</strong>
+                            â‚¹${price}
+                        </div>
+
+                        <div>
+                            <strong>Stock:</strong>
+                            ${stock}
+                        </div>
+
+                    </div>
+
+                </div>
+            `;
+                }
+
+                /* =========================================
+                   RETURN PRODUCT SUMMARY
+                   ========================================= */
+
+                if (productsHtml) {
+
+                    return `
+                <div class="ai-available-products">
+
+                    <h4 class="ai-products-heading">
+                        ${title}
+                    </h4>
+
+                    <div class="ai-products-list">
+                        ${productsHtml}
+                    </div>
+
+                    ${footer
+                            ? `
+                                <div class="ai-products-footer">
+                                    ${footer}
+                                </div>
+                            `
+                            : ""
+                        }
+
+                </div>
+            `;
+                }
+            }
+
+            /* =========================================
+               5. NORMAL AI RESPONSE
+               ========================================= */
+
+            safe = escapeHtml(safe);
+
+            /* =========================================
+               6. BOLD TEXT
+               ========================================= */
+
+            safe = safe.replace(
+                /\*\*(.*?)\*\*/g,
+                "<strong>$1</strong>"
+            );
+
+            /* =========================================
+               7. HEADINGS
+               ========================================= */
+
+            safe = safe.replace(
+                /^###\s+(.*?)$/gm,
+                "<h4>$1</h4>"
+            );
+
+            safe = safe.replace(
+                /^##\s+(.*?)$/gm,
+                "<h3>$1</h3>"
+            );
+
+            safe = safe.replace(
+                /^#\s+(.*?)$/gm,
+                "<h2>$1</h2>"
+            );
+
+            /* =========================================
+               8. BULLET POINTS
+               ========================================= */
+
+            safe = safe.replace(
+                /^[ \t]*[-â€¢*][ \t]+(.*?)$/gm,
+                "<li>$1</li>"
+            );
+
+            /* =========================================
+               9. NUMBERED LIST
+               ========================================= */
+
+            safe = safe.replace(
+                /^[ \t]*\d+\.[ \t]+(.*?)$/gm,
+                "<li>$1</li>"
+            );
+
+            /* =========================================
+               10. WRAP LIST ITEMS
+               ========================================= */
+
+            safe = safe.replace(
+                /((?:<li>.*?<\/li>\s*)+)/gs,
+                "<ul>$1</ul>"
+            );
+
+            /* =========================================
+               11. HORIZONTAL LINE
+               ========================================= */
+
+            safe = safe.replace(
+                /^---$/gm,
+                "<hr>"
+            );
+
+            /* =========================================
+               12. NEW LINES
+               ========================================= */
+
+            safe = safe.replace(
+                /\n/g,
+                "<br>"
+            );
+
+            /* =========================================
+               13. REMOVE EXTRA BR AFTER HTML
+               ========================================= */
+
+            safe = safe.replace(
+                /(<\/h[234]>)<br>/g,
+                "$1"
+            );
+
+            safe = safe.replace(
+                /(<\/ul>)<br>/g,
+                "$1"
+            );
+
+            safe = safe.replace(
+                /(<hr>)<br>/g,
+                "$1"
+            );
 
             return safe;
         }
@@ -291,6 +521,29 @@
 
         function addAIMessage(message) {
 
+            if (!message) {
+                return;
+            }
+
+            const text = String(message)
+                .replace(/\\([#*_])/g, "$1")
+                .trim();
+
+            /*
+             * Do not display raw product catalog text.
+             * Product cards are displayed separately.
+             */
+
+            const isProductListResponse =
+                text.includes("### ðŸ›ï¸ Available Products") ||
+                text.includes("### ðŸ‘œ Available Handbags") ||
+                text.includes("Available Products") ||
+                text.includes("Available Handbags");
+
+            if (isProductListResponse) {
+                return;
+            }
+
             const messageDiv =
                 document.createElement("div");
 
@@ -306,7 +559,7 @@
 
 
             contentDiv.innerHTML =
-                formatAIText(message);
+                formatAIText(text);
 
 
             messageDiv.appendChild(
@@ -323,10 +576,10 @@
 
         /* =========================================
            PRODUCT CARDS
-    
+
            This function displays the REAL product
            image supplied by Django.
-    
+
         ========================================= */
 
         function addProductCards(products) {
@@ -361,7 +614,7 @@
                 "products-title";
 
             title.textContent =
-                "🛍️ Product Details";
+                "ðŸ›ï¸ Product Details";
 
 
             contentDiv.appendChild(
@@ -585,7 +838,7 @@
                     ) {
 
                         price.textContent =
-                            "₹" +
+                            "â‚¹" +
                             numericPrice.toLocaleString(
                                 "en-IN",
                                 {
@@ -597,7 +850,7 @@
                     else {
 
                         price.textContent =
-                            "₹" +
+                            "â‚¹" +
                             product.price;
                     }
 
@@ -631,7 +884,7 @@
                         );
 
                         stock.textContent =
-                            "✅ In Stock (" +
+                            "âœ… In Stock (" +
                             product.inventory +
                             " available)";
 
@@ -643,7 +896,7 @@
                         );
 
                         stock.textContent =
-                            "❌ Out of Stock";
+                            "âŒ Out of Stock";
                     }
 
 
@@ -776,7 +1029,7 @@
                         "product-button chatbot-add-cart-btn";
 
                     cartButton.innerHTML =
-                        "🛒 Add to Cart";
+                        "ðŸ›’ Add to Cart";
 
                     cartButton.target =
                         "_self";
@@ -828,7 +1081,7 @@
 
             let html = `
         <div class="comparison-title">
-            ⚖️ Product Comparison
+            âš–ï¸ Product Comparison
         </div>
 
         <div class="comparison-grid">
@@ -846,43 +1099,43 @@
             <div class="comparison-card">
 
                 <div class="comparison-product-name">
-                    👜 ${product.name || "Product"}
+                    ðŸ‘œ ${product.name || "Product"}
                 </div>
 
                 <div class="comparison-row">
-                    <span>🏷️ Brand</span>
+                    <span>ðŸ·ï¸ Brand</span>
                     <strong>${product.brand || "-"}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>💰 Price</span>
-                    <strong>₹${Number(product.price || 0).toLocaleString("en-IN", {
+                    <span>ðŸ’° Price</span>
+                    <strong>â‚¹${Number(product.price || 0).toLocaleString("en-IN", {
                     minimumFractionDigits: 2
                 })}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>📦 Availability</span>
+                    <span>ðŸ“¦ Availability</span>
                     <strong>
                         ${inventory > 0
-                        ? `✅ In Stock (${inventory} available)`
-                        : `❌ Out of Stock`
+                        ? `âœ… In Stock (${inventory} available)`
+                        : `âŒ Out of Stock`
                     }
                     </strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>📂 Category</span>
+                    <span>ðŸ“‚ Category</span>
                     <strong>${product.category || "-"}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>📁 Subcategory</span>
+                    <span>ðŸ“ Subcategory</span>
                     <strong>${product.subcategory || "-"}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>📝 Description</span>
+                    <span>ðŸ“ Description</span>
                     <strong>${product.description || "-"}</strong>
                 </div>
 
@@ -892,7 +1145,7 @@
                             href="${cartUrl}"
                             class="comparison-cart-btn"
                         >
-                            🛒 Add to Cart
+                            ðŸ›’ Add to Cart
                         </a>
                     `
                         : `
@@ -900,7 +1153,7 @@
                             class="comparison-cart-btn"
                             disabled
                         >
-                            ❌ Out of Stock
+                            âŒ Out of Stock
                         </button>
                     `
                     }
@@ -968,7 +1221,7 @@
                 "recommendation-title";
 
             title.textContent =
-                "🏆 Better Choice";
+                "ðŸ† Better Choice";
 
 
             recommendation.appendChild(
@@ -1019,17 +1272,6 @@
 
 
         /* =========================================
-           DISPLAY AI RESPONSE
-    
-           IMPORTANT FIX:
-           ai_services.py can return product
-           information as JSON INSIDE data.answer.
-    
-           This function now detects that JSON
-           and sends the products to addProductCards().
-        ========================================= */
-
-        /* =========================================
        DISPLAY AI RESPONSE
        FIXED:
        If Django also returns structured products,
@@ -1037,6 +1279,7 @@
        the normal AI answer so the product card is
        displayed only once.
     ========================================= */
+
         function displayAIResponse(data) {
 
             if (!data) {
@@ -1044,7 +1287,7 @@
                 return;
             }
 
-            let answer = data.answer || "";
+            let answer = formatAIText(data.answer || "");
 
             /*
              * ==========================================================
@@ -1065,12 +1308,10 @@
                         /*
                          * ==================================================
                          * PRODUCT COMPARISON
-                         * Only comparison requests should use comparison UI
                          * ==================================================
                          */
 
                         if (
-                            parsedAnswer.type === "product_results" ||
                             parsedAnswer.type === "comparison" ||
                             parsedAnswer.type === "product_comparison"
                         ) {
@@ -1079,18 +1320,57 @@
                                 Array.isArray(data.products) &&
                                 data.products.length >= 2
                             ) {
-
                                 addComparison(data.products);
-
                             }
                             else if (parsedAnswer.message) {
-
-                                addAIMessage(parsedAnswer.message);
+                                addAIMessage(
+                                    formatAIText(parsedAnswer.message)
+                                );
                             }
 
                             return;
                         }
 
+                        /*
+                         * ==================================================
+                         * PRODUCT RESULTS / CATALOG
+                         * ==================================================
+                         */
+
+                        if (
+                            parsedAnswer.type === "product_results"
+                        ) {
+
+                            /*
+                             * Show the AI message only when
+                             * there are no product cards.
+                             */
+
+                            if (
+                                (!Array.isArray(data.products) ||
+                                    data.products.length === 0) &&
+                                parsedAnswer.message
+                            ) {
+
+                                addAIMessage(
+                                    formatAIText(parsedAnswer.message)
+                                );
+                            }
+
+                            /*
+                             * Show product cards when products exist.
+                             */
+
+                            if (
+                                Array.isArray(data.products) &&
+                                data.products.length > 0
+                            ) {
+
+                                addProductCards(data.products);
+                            }
+
+                            return;
+                        }
 
                         /*
                          * ==================================================
@@ -1108,16 +1388,16 @@
                             ) {
 
                                 addProductCards(data.products);
-
                             }
                             else if (parsedAnswer.message) {
 
-                                addAIMessage(parsedAnswer.message);
+                                addAIMessage(
+                                    formatAIText(parsedAnswer.message)
+                                );
                             }
 
                             return;
                         }
-
 
                         /*
                          * ==================================================
@@ -1129,22 +1409,18 @@
                             parsedAnswer.type === "product_catalog"
                         ) {
 
-                            /*
-                             * Show normal product cards.
-                             * Do NOT use comparison.
-                             */
-
                             if (
                                 Array.isArray(data.products) &&
                                 data.products.length > 0
                             ) {
 
                                 addProductCards(data.products);
-
                             }
                             else if (parsedAnswer.message) {
 
-                                addAIMessage(parsedAnswer.message);
+                                addAIMessage(
+                                    formatAIText(parsedAnswer.message)
+                                );
                             }
 
                             return;
@@ -1160,7 +1436,6 @@
                 }
             }
 
-
             /*
              * ==========================================================
              * NORMAL AI TEXT
@@ -1174,9 +1449,41 @@
                 !answer.trim().startsWith("[")
             ) {
 
-                addAIMessage(answer);
-            }
+                /*
+                 * answer has ALREADY been processed by formatAIText().
+                 *
+                 * Do not run another Markdown cleanup here.
+                 */
 
+                const cleanAnswer = answer.trim();
+
+                /*
+                 * Detect catalog/product-list responses.
+                 */
+
+                const isProductListResponse =
+                    cleanAnswer.includes("Available Products") ||
+                    cleanAnswer.includes("Available Handbags") ||
+                    cleanAnswer.includes("ai-available-products");
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Product-list responses are handled by the
+                 * formatted answer OR product cards.
+                 *
+                 * Do not display the raw backend answer.
+                 */
+
+                if (
+                    !isProductListResponse ||
+                    !Array.isArray(data.products) ||
+                    data.products.length === 0
+                ) {
+
+                    addAIMessage(cleanAnswer);
+                }
+            }
 
             /*
              * ==========================================================
@@ -1184,9 +1491,10 @@
              * ==========================================================
              *
              * IMPORTANT:
-             * Do NOT automatically make every multiple-product
-             * response a comparison.
-             * ==========================================================
+             * Do NOT display product cards here if the response
+             * was already handled above as structured JSON.
+             *
+             * This prevents duplicate product cards.
              */
 
             if (
@@ -1195,30 +1503,21 @@
             ) {
 
                 /*
-                 * If backend explicitly says comparison,
-                 * use comparison UI.
+                 * Only display here when the response was not
+                 * a structured product response.
                  */
 
                 if (
-                    data.type === "product_results" ||
-                    data.type === "comparison" ||
-                    data.type === "product_comparison"
+                    data.type !== "product_results" &&
+                    data.type !== "product_catalog" &&
+                    data.type !== "product_detail" &&
+                    data.type !== "comparison" &&
+                    data.type !== "product_comparison"
                 ) {
-
-                    addComparison(data.products);
-
-                }
-                else {
-
-                    /*
-                     * Available products / catalog / search results
-                     * use normal product cards.
-                     */
 
                     addProductCards(data.products);
                 }
             }
-
 
             /*
              * ==========================================================
@@ -1233,7 +1532,6 @@
 
                 addRecommendation(data);
             }
-
 
             /*
              * ==========================================================
@@ -1254,6 +1552,7 @@
                 );
             }
         }
+
 
 
         /* =========================================
@@ -1312,7 +1611,7 @@
             <div class="chatbot-products">
 
                 <h4 class="mb-3">
-                    🛍️ Product Details
+                    ðŸ›ï¸ Product Details
                 </h4>
         `;
 
@@ -1397,7 +1696,7 @@
                         <p class="chatbot-product-price">
 
                             <strong>
-                                ₹${Number(price).toLocaleString(
+                                â‚¹${Number(price).toLocaleString(
                         "en-IN",
                         {
                             minimumFractionDigits: 2,
@@ -1414,7 +1713,7 @@
                                 <p class="text-success">
 
                                     <strong>
-                                        ✅ In Stock
+                                        âœ… In Stock
                                     </strong>
 
                                     (${inventory} available)
@@ -1425,7 +1724,7 @@
                                 <p class="text-danger">
 
                                     <strong>
-                                        ❌ Out of Stock
+                                        âŒ Out of Stock
                                     </strong>
 
                                 </p>
@@ -1483,7 +1782,7 @@
                                         href="${addToCartUrl}"
                                         class="btn btn-success chatbot-add-cart-btn"
                                     >
-                                        🛒 Add to Cart
+                                        ðŸ›’ Add to Cart
                                     </a>
                                 `
                         : `
@@ -1491,7 +1790,7 @@
                                         class="btn btn-secondary"
                                         disabled
                                     >
-                                        ❌ Out of Stock
+                                        âŒ Out of Stock
                                     </button>
                                 `
                     }

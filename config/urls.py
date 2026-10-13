@@ -82,6 +82,8 @@ urlpatterns = [
         ),
         name="password_reset_complete"
     ),
+
+
 ]
 
 # Serve uploaded media files during development
