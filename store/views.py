@@ -1845,96 +1845,105 @@ def chatbot_api(request):
 
             "products": [],
         })
-     # ============================================================
-     # 4A. SPECIFIC PRODUCT STOCK / COUNT QUESTIONS
-     # ============================================================
+    # ============================================================
+    # 4A. SPECIFIC PRODUCT STOCK / COUNT QUESTIONS
+    # ============================================================
 
     specific_count_intent = (
-          "how many" in clean_question
-          or "howmany" in clean_question
-          or "count" in clean_question
-          or "number of" in clean_question
-          or "total" in clean_question
+        "how many" in clean_question
+        or "howmany" in clean_question
+        or "count" in clean_question
+        or "number of" in clean_question
+        or "total" in clean_question
     )
 
     specific_stock_intent = (
-         "available" in clean_question
-         or "in stock" in clean_question
-         or "stock" in clean_question
+        "available" in clean_question
+        or "in stock" in clean_question
+        or "stock" in clean_question
     )
 
     if specific_count_intent or specific_stock_intent:
 
-       # Match the most specific product name first.
-         sorted_products = sorted(
-           product_data,
-           key=lambda item: len(
-              str(item.get("name") or "")
-           ),
-           reverse=True,
-    )
+        # Match the most specific product name first.
+        sorted_products = sorted(
+            product_data,
+            key=lambda item: len(
+                str(item.get("name") or "")
+            ),
+            reverse=True,
+        )
 
-    for product in sorted_products:
-        product_name = str(
-            product.get("name") or ""
-        ).strip()
+        for product in sorted_products:
+            product_name = str(
+                product.get("name") or ""
+            ).strip()
 
-        if not product_name:
-            continue
+            if not product_name:
+                continue
 
-        # Allow plural forms of the last word in a product name.
-        name_parts = product_name.lower().split()
-        last_word = name_parts[-1]
+            # Allow plural forms of the last word in a product name.
+            name_parts = product_name.lower().split()
+            last_word = name_parts[-1]
 
-        if last_word.endswith("y") and len(last_word) > 1:
-            last_pattern = (
-                re.escape(last_word[:-1]) + r"(?:y|ies)"
-            )
-        elif last_word.endswith(("s", "x", "z", "ch", "sh")):
-            last_pattern = re.escape(last_word) + r"(?:es)?"
-        else:
-            last_pattern = re.escape(last_word) + r"s?"
-
-        if len(name_parts) > 1:
-            name_pattern = (
-                r"\b"
-                + r"\s+".join(
-                    re.escape(word)
-                    for word in name_parts[:-1]
+            if last_word.endswith("y") and len(last_word) > 1:
+                last_pattern = (
+                    re.escape(last_word[:-1]) + r"(?:y|ies)"
                 )
-                + r"\s+"
-                + last_pattern
-                + r"\b"
-            )
-        else:
-            name_pattern = r"\b" + last_pattern + r"\b"
+            elif last_word.endswith(
+                ("s", "x", "z", "ch", "sh")
+            ):
+                last_pattern = (
+                    re.escape(last_word) + r"(?:es)?"
+                )
+            else:
+                last_pattern = re.escape(last_word) + r"s?"
 
-        if re.search(name_pattern, clean_question):
-            stock_quantity = int(
-                product.get("inventory") or 0
-            )
-
-            if specific_stock_intent:
-                if stock_quantity > 0:
-                    answer = (
-                        f"There are **{stock_quantity} units of "
-                        f"{product_name} available**."
+            if len(name_parts) > 1:
+                name_pattern = (
+                    r"\b"
+                    + r"\s+".join(
+                        re.escape(word)
+                        for word in name_parts[:-1]
                     )
+                    + r"\s+"
+                    + last_pattern
+                    + r"\b"
+                )
+            else:
+                name_pattern = (
+                    r"\b" + last_pattern + r"\b"
+                )
+
+            if re.search(name_pattern, clean_question):
+                stock_quantity = int(
+                    product.get("inventory") or 0
+                )
+
+                if specific_stock_intent:
+                    if stock_quantity > 0:
+                        answer = (
+                            f"There are **{stock_quantity} units of "
+                            f"{product_name} available**."
+                        )
+                    else:
+                        answer = (
+                            f"**{product_name}** is currently "
+                            "out of stock."
+                        )
                 else:
                     answer = (
-                        f"**{product_name}** is currently out of stock."
+                        f"There is **1 {product_name} product** "
+                        "in our catalog."
                     )
-            else:
-                answer = (
-                    f"There is **1 {product_name} product** "
-                    f"in our catalog."
-                )
 
-            return JsonResponse({
-                "success": True,
-                "answer": answer,
-                "products": [make_product_card(product)],
-            })
+                return JsonResponse({
+                    "success": True,
+                    "answer": answer,
+                    "products": [
+                        make_product_card(product)
+                    ],
+                })
 
 
     # ============================================================
@@ -2762,6 +2771,11 @@ def chatbot_api(request):
 
         "how can i add something to cart",
         "how do i add something to cart",
+        "add to cart process",
+        "how to add to cart",
+        "how to use the cart",
+        "cart process",
+        "process of adding products to cart",
     ]
 
     if any(

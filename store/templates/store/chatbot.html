@@ -166,306 +166,162 @@
 
 
         function formatAIText(text) {
-
             if (!text) {
                 return "";
             }
 
-            /* =========================================
-               1. CONVERT RESPONSE TO STRING
-               ========================================= */
+            // 1. Convert response to string and normalize line breaks
+            let safe = String(text)
+                .replace(/\r\n/g, "\n")
+                .replace(/\r/g, "\n");
 
-            let safe = String(text);
-
-            /* =========================================
-               2. NORMALIZE LINE BREAKS
-               ========================================= */
-
-            safe = safe.replace(/\r\n/g, "\n");
-            safe = safe.replace(/\r/g, "\n");
-
-            /* =========================================
-               3. REMOVE ESCAPED MARKDOWN CHARACTERS
-
-               Converts:
-               \###  â†’ ###
-               \*\*  â†’ **
-               \*    â†’ *
-               \_    â†’ _
-               ========================================= */
-
+            // 2. Remove backslashes before escaped Markdown characters
             safe = safe.replace(/\\([#*_`])/g, "$1");
 
-            /* =========================================
-               4. AVAILABLE PRODUCTS / HANDBAGS
-               ========================================= */
+            // 3. Correct common currency and emoji encoding issues
+            safe = safe
+                .replace(/â‚¹/g, "\u20B9")
+                .replace(/âœ…/g, "\u2705")
+                .replace(/âŒ/g, "\u274C")
+                .replace(/ðŸ›ï¸/g, "\u{1F6CD}\uFE0F")
+                .replace(/ðŸ‘œ/g, "\u{1F45C}");
 
+            // 4. Handle the existing Available Products / Handbags layout
             const hasAvailableProducts =
-                safe.includes("### ðŸ›ï¸ Available Products") ||
-                safe.includes("### ðŸ‘œ Available Handbags") ||
-                safe.includes("ðŸ›ï¸ Available Products") ||
-                safe.includes("ðŸ‘œ Available Handbags");
+                /Available Products/i.test(safe) ||
+                /Available Handbags/i.test(safe);
+
+            const title = /Available Handbags/i.test(safe)
+                ? "\u{1F45C} Available Handbags"
+                : "\u{1F6CD}\uFE0F Available Products";
 
             if (hasAvailableProducts) {
-
-                let title = "ðŸ›ï¸ Available Products";
-
-                if (
-                    safe.includes("### ðŸ‘œ Available Handbags") ||
-                    safe.includes("ðŸ‘œ Available Handbags")
-                ) {
-                    title = "ðŸ‘œ Available Handbags";
-                }
-
-                /* =========================================
-                   REMOVE HEADING
-                   ========================================= */
-
-                safe = safe
-                    .replace(/###\s*ðŸ›ï¸\s*Available Products/g, "")
-                    .replace(/###\s*ðŸ‘œ\s*Available Handbags/g, "")
-                    .replace(/ðŸ›ï¸\s*Available Products/g, "")
-                    .replace(/ðŸ‘œ\s*Available Handbags/g, "")
+                let productText = safe
+                    .replace(/^#{1,3}\s*.*Available Products.*$/gim, "")
+                    .replace(/^#{1,3}\s*.*Available Handbags.*$/gim, "")
                     .trim();
 
-                /* =========================================
-                   REMOVE FOOTER
-                   ========================================= */
-
-                let footer = "";
-
-                const footerPattern =
-                    /You can view the product details or use the\s+\*\*Add to Cart\*\*\s+button on the product cards\.?/;
-
-                if (footerPattern.test(safe)) {
-
-                    footer =
-                        "You can view the product details or use the " +
-                        "<strong>Add to Cart</strong> button on the product cards.";
-
-                    safe = safe
-                        .replace(footerPattern, "")
-                        .trim();
-                }
-
-                /* =========================================
-                   NORMALIZE ONE-LINE PRODUCT RESPONSE
-
-                   Example:
-
-                   **Classic White Sneakers** - Brand: UrbanStep
-                   - Price: â‚¹2,499.00 - Stock: 30 available
-
-                   becomes separate lines.
-                   ========================================= */
-
-                safe = safe.replace(
-                    /\s+\*\*(?=[A-Z])/g,
-                    "\n**"
-                );
-
-                safe = safe.replace(
-                    /\s+-\s+Brand:/g,
-                    "\n- Brand:"
-                );
-
-                safe = safe.replace(
-                    /\s+-\s+Price:/g,
-                    "\n- Price:"
-                );
-
-                safe = safe.replace(
-                    /\s+-\s+Stock:/g,
-                    "\n- Stock:"
-                );
-
-                /* =========================================
-                   PRODUCT REGEX
-                   ========================================= */
+                productText = productText
+                    .replace(/\s+-\s+Brand:/gi, "\n- Brand:")
+                    .replace(/\s+-\s+Price:/gi, "\n- Price:")
+                    .replace(/\s+-\s+Stock:/gi, "\n- Stock:");
 
                 const productPattern =
-                    /\*\*(.*?)\*\*\s*-\s*Brand:\s*(.*?)\s*-\s*Price:\s*â‚¹([\d,]+(?:\.\d+)?)\s*-\s*Stock:\s*([^\n]*?)(?=\s*\*\*|$)/gs;
+                    /^\*\*(.+?)\*\*\s*\n-\s*Brand:\s*(.+?)\s*\n-\s*Price:\s*\u20B9?\s*([\d,]+(?:\.\d+)?)\s*\n-\s*Stock:\s*([^\n]+)/gm;
 
                 let productsHtml = "";
                 let match;
 
-                while (
-                    (match = productPattern.exec(safe)) !== null
-                ) {
-
-                    const productName =
-                        escapeHtml(match[1].trim());
-
-                    const brand =
-                        escapeHtml(match[2].trim());
-
-                    const price =
-                        escapeHtml(match[3].trim());
-
-                    const stock =
-                        escapeHtml(match[4].trim());
+                while ((match = productPattern.exec(productText)) !== null) {
+                    const productName = escapeHtml(match[1].trim());
+                    const brand = escapeHtml(match[2].trim());
+                    const price = escapeHtml(match[3].trim());
+                    const stock = escapeHtml(match[4].trim());
 
                     productsHtml += `
                 <div class="ai-product-summary">
-
                     <div class="ai-product-summary-name">
                         ${productName}
                     </div>
-
                     <div class="ai-product-summary-details">
-
-                        <div>
-                            <strong>Brand:</strong>
-                            ${brand}
-                        </div>
-
-                        <div>
-                            <strong>Price:</strong>
-                            â‚¹${price}
-                        </div>
-
-                        <div>
-                            <strong>Stock:</strong>
-                            ${stock}
-                        </div>
-
+                        <div><strong>Brand:</strong> ${brand}</div>
+                        <div><strong>Price:</strong> \u20B9${price}</div>
+                        <div><strong>Stock:</strong> ${stock}</div>
                     </div>
-
                 </div>
             `;
                 }
 
-                /* =========================================
-                   RETURN PRODUCT SUMMARY
-                   ========================================= */
-
                 if (productsHtml) {
-
                     return `
                 <div class="ai-available-products">
-
-                    <h4 class="ai-products-heading">
-                        ${title}
-                    </h4>
-
+                    <h4 class="ai-products-heading">${title}</h4>
                     <div class="ai-products-list">
                         ${productsHtml}
                     </div>
-
-                    ${footer
-                            ? `
-                                <div class="ai-products-footer">
-                                    ${footer}
-                                </div>
-                            `
-                            : ""
-                        }
-
                 </div>
             `;
                 }
             }
 
-            /* =========================================
-               5. NORMAL AI RESPONSE
-               ========================================= */
+            // 5. Escape HTML before formatting Markdown
+            const containsHTML = /<\/?(?:strong|em|b|i|br|ul|ol|li|h[1-6]|p|hr)\b[^>]*>/i.test(safe);
 
-            safe = escapeHtml(safe);
+            if (!containsHTML) {
+                safe = escapeHtml(safe);
+            }
 
-            /* =========================================
-               6. BOLD TEXT
-               ========================================= */
+            // 6. Format headings
+            safe = safe
+                .replace(/^###\s+(.+)$/gm, "<h4>$1</h4>")
+                .replace(/^##\s+(.+)$/gm, "<h3>$1</h3>")
+                .replace(/^#\s+(.+)$/gm, "<h2>$1</h2>");
 
+            // 7. Format bold and italic text
+            safe = safe
+                .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+
+            // 8. Format numbered and bulleted list items
             safe = safe.replace(
-                /\*\*(.*?)\*\*/g,
-                "<strong>$1</strong>"
-            );
-
-            /* =========================================
-               7. HEADINGS
-               ========================================= */
-
-            safe = safe.replace(
-                /^###\s+(.*?)$/gm,
-                "<h4>$1</h4>"
-            );
-
-            safe = safe.replace(
-                /^##\s+(.*?)$/gm,
-                "<h3>$1</h3>"
-            );
-
-            safe = safe.replace(
-                /^#\s+(.*?)$/gm,
-                "<h2>$1</h2>"
-            );
-
-            /* =========================================
-               8. BULLET POINTS
-               ========================================= */
-
-            safe = safe.replace(
-                /^[ \t]*[-â€¢*][ \t]+(.*?)$/gm,
+                /^[ \t]*(?:\d+\.\s+|[-*•]\s+)(.+)$/gm,
                 "<li>$1</li>"
             );
 
-            /* =========================================
-               9. NUMBERED LIST
-               ========================================= */
-
+            // 9. Group consecutive list items into lists
             safe = safe.replace(
-                /^[ \t]*\d+\.[ \t]+(.*?)$/gm,
-                "<li>$1</li>"
+                /((?:<li>[\s\S]*?<\/li>\s*)+)/g,
+                function (listItems) {
+                    const isNumbered = /^\s*\d+\./m.test(listItems);
+                    const tag = isNumbered ? "ol" : "ul";
+
+                    return "<" + tag + ">" +
+                        listItems.replace(/\s+$/, "") +
+                        "</" + tag + ">";
+                }
             );
 
-            /* =========================================
-               10. WRAP LIST ITEMS
-               ========================================= */
+            // 10. Format horizontal rules
+            safe = safe.replace(/^---$/gm, "<hr>");
 
+            // 11. Convert remaining newlines into HTML line breaks
+            safe = safe.replace(/\n/g, "<br>");
+
+            // 12. Remove breaks around headings, lists and horizontal rules
+            safe = safe
+                .replace(/<br>\s*(?=<h[2-4]\b|<ol\b|<ul\b|<hr\b)/gi, "")
+                .replace(/<\/h[2-4]>\s*<br>/gi, "</h4>")
+                .replace(/<br>\s*(?=<li\b)/gi, "")
+                .replace(/<\/li>\s*<br>/gi, "</li>")
+                .replace(/<br>\s*<\/(?:ul|ol)>/gi, "")
+                .replace(/<\/(?:ul|ol)>\s*<br>/gi, function () {
+                    return "</ul>";
+                })
+                .replace(/(<hr>)<br>/gi, "$1");
+
+            // Convert Markdown headings
+            safe = safe.replace(/^###\s+(.+)$/gm, "<h4>$1</h4>");
+            safe = safe.replace(/^##\s+(.+)$/gm, "<h3>$1</h3>");
+
+            // Convert Markdown bold text
+            safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+            // Convert bullet points
+            safe = safe.replace(/^[•*-]\s+(.+)$/gm, "<li>$1</li>");
+
+            // Wrap consecutive list items in a list
             safe = safe.replace(
                 /((?:<li>.*?<\/li>\s*)+)/gs,
                 "<ul>$1</ul>"
             );
 
-            /* =========================================
-               11. HORIZONTAL LINE
-               ========================================= */
-
-            safe = safe.replace(
-                /^---$/gm,
-                "<hr>"
-            );
-
-            /* =========================================
-               12. NEW LINES
-               ========================================= */
-
-            safe = safe.replace(
-                /\n/g,
-                "<br>"
-            );
-
-            /* =========================================
-               13. REMOVE EXTRA BR AFTER HTML
-               ========================================= */
-
-            safe = safe.replace(
-                /(<\/h[234]>)<br>/g,
-                "$1"
-            );
-
-            safe = safe.replace(
-                /(<\/ul>)<br>/g,
-                "$1"
-            );
-
-            safe = safe.replace(
-                /(<hr>)<br>/g,
-                "$1"
-            );
+            // Add spacing after headings and list blocks
+            safe = safe.replace(/<\/h4>/g, "</h4><br>");
+            safe = safe.replace(/<\/ul>/g, "</ul><br>");
 
             return safe;
         }
+
 
 
         /* =========================================
@@ -534,9 +390,10 @@
              * Product cards are displayed separately.
              */
 
+
             const isProductListResponse =
-                text.includes("### ðŸ›ï¸ Available Products") ||
-                text.includes("### ðŸ‘œ Available Handbags") ||
+                /(?:###\s*)?(?:🛍️|🛍)\s*Available Products/i.test(text) ||
+                /(?:###\s*)?👜\s*Available Handbags/i.test(text) ||
                 text.includes("Available Products") ||
                 text.includes("Available Handbags");
 
@@ -614,7 +471,7 @@
                 "products-title";
 
             title.textContent =
-                "ðŸ›ï¸ Product Details";
+                "\u{1F6CD}\u{FE0F} Product Details";
 
 
             contentDiv.appendChild(
@@ -838,7 +695,7 @@
                     ) {
 
                         price.textContent =
-                            "â‚¹" +
+                            "\u20B9" +
                             numericPrice.toLocaleString(
                                 "en-IN",
                                 {
@@ -850,7 +707,7 @@
                     else {
 
                         price.textContent =
-                            "â‚¹" +
+                            "\u20B9" +
                             product.price;
                     }
 
@@ -884,7 +741,7 @@
                         );
 
                         stock.textContent =
-                            "âœ… In Stock (" +
+                            "\u2705 In Stock (" +
                             product.inventory +
                             " available)";
 
@@ -896,7 +753,7 @@
                         );
 
                         stock.textContent =
-                            "âŒ Out of Stock";
+                            "\u{274C} Out of Stock";
                     }
 
 
@@ -1029,7 +886,7 @@
                         "product-button chatbot-add-cart-btn";
 
                     cartButton.innerHTML =
-                        "ðŸ›’ Add to Cart";
+                        "\u{1F6D2} Add to Cart";
 
                     cartButton.target =
                         "_self";
@@ -1081,7 +938,7 @@
 
             let html = `
         <div class="comparison-title">
-            âš–ï¸ Product Comparison
+            ⚖️ Product Comparison
         </div>
 
         <div class="comparison-grid">
@@ -1099,43 +956,43 @@
             <div class="comparison-card">
 
                 <div class="comparison-product-name">
-                    ðŸ‘œ ${product.name || "Product"}
+                      👜 ${product.name || "Product"}
                 </div>
 
                 <div class="comparison-row">
-                    <span>ðŸ·ï¸ Brand</span>
+                    <span>🏷️ Brand</span>
                     <strong>${product.brand || "-"}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>ðŸ’° Price</span>
-                    <strong>â‚¹${Number(product.price || 0).toLocaleString("en-IN", {
+                    <span>💰 Price</span>
+                    <strong>₹${Number(product.price || 0).toLocaleString("en-IN", {
                     minimumFractionDigits: 2
                 })}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>ðŸ“¦ Availability</span>
+                    <span>📦 Availability</span>
                     <strong>
                         ${inventory > 0
-                        ? `âœ… In Stock (${inventory} available)`
-                        : `âŒ Out of Stock`
+                        ? `\u2705 In Stock (${inventory} available)`
+                        : `\u274C Out of Stock`
                     }
                     </strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>ðŸ“‚ Category</span>
+                    <span>📂 Category</span>
                     <strong>${product.category || "-"}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>ðŸ“ Subcategory</span>
+                    <span>📁 Subcategory</span>
                     <strong>${product.subcategory || "-"}</strong>
                 </div>
 
                 <div class="comparison-row">
-                    <span>ðŸ“ Description</span>
+                    <span>📝 Description</span>
                     <strong>${product.description || "-"}</strong>
                 </div>
 
@@ -1145,7 +1002,7 @@
                             href="${cartUrl}"
                             class="comparison-cart-btn"
                         >
-                            ðŸ›’ Add to Cart
+                             \u{1F6D2} Add to Cart
                         </a>
                     `
                         : `
@@ -1153,7 +1010,7 @@
                             class="comparison-cart-btn"
                             disabled
                         >
-                            âŒ Out of Stock
+                           ❌  Out of Stock
                         </button>
                     `
                     }
@@ -1221,7 +1078,7 @@
                 "recommendation-title";
 
             title.textContent =
-                "ðŸ† Better Choice";
+                " Better Choice";
 
 
             recommendation.appendChild(
@@ -1287,7 +1144,7 @@
                 return;
             }
 
-            let answer = formatAIText(data.answer || "");
+            let answer = data.answer || "";
 
             /*
              * ==========================================================
@@ -1323,9 +1180,9 @@
                                 addComparison(data.products);
                             }
                             else if (parsedAnswer.message) {
-                                addAIMessage(
-                                    formatAIText(parsedAnswer.message)
-                                );
+                                addAIMessage
+                                    (parsedAnswer.message)
+
                             }
 
                             return;
@@ -1611,7 +1468,7 @@
             <div class="chatbot-products">
 
                 <h4 class="mb-3">
-                    ðŸ›ï¸ Product Details
+                   🛍️ Product Details
                 </h4>
         `;
 
@@ -1696,7 +1553,7 @@
                         <p class="chatbot-product-price">
 
                             <strong>
-                                â‚¹${Number(price).toLocaleString(
+                                 ₹${Number(price).toLocaleString(
                         "en-IN",
                         {
                             minimumFractionDigits: 2,
@@ -1713,7 +1570,7 @@
                                 <p class="text-success">
 
                                     <strong>
-                                        âœ… In Stock
+                                         ✅ In Stock
                                     </strong>
 
                                     (${inventory} available)
@@ -1724,7 +1581,7 @@
                                 <p class="text-danger">
 
                                     <strong>
-                                        âŒ Out of Stock
+                                       ❌ Out of Stock
                                     </strong>
 
                                 </p>
@@ -1782,7 +1639,7 @@
                                         href="${addToCartUrl}"
                                         class="btn btn-success chatbot-add-cart-btn"
                                     >
-                                        ðŸ›’ Add to Cart
+                                         🛒 Add to Cart
                                     </a>
                                 `
                         : `
@@ -1790,7 +1647,7 @@
                                         class="btn btn-secondary"
                                         disabled
                                     >
-                                        âŒ Out of Stock
+                                        ❌ Out of Stock
                                     </button>
                                 `
                     }
