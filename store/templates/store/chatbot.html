@@ -186,7 +186,38 @@
                 .replace(/ðŸ›ï¸/g, "\u{1F6CD}\uFE0F")
                 .replace(/ðŸ‘œ/g, "\u{1F45C}");
 
-            // 4. Handle the existing Available Products / Handbags layout
+            // 4. Format coupon responses separately
+            if (/Available Coupons/i.test(safe)) {
+
+                let couponText = escapeHtml(safe);
+
+                // Format the coupon heading
+                couponText = couponText.replace(
+                    /🎟️?\s*\*{0,2}\s*Available Coupons\s*\*{0,2}/i,
+                    "<h4>🎟️ Available Coupons</h4>"
+                );
+
+                // Start each new coupon on a separate section
+                couponText = couponText.replace(
+                    /\s*\*\*Code:\*\*\s*/gi,
+                    "<br><br><strong>Code:</strong> "
+                );
+
+                // Put every coupon detail on its own line
+                couponText = couponText.replace(
+                    /\s*\*\*(Offer|Minimum order|Maximum discount|Valid until|Restriction|Remaining uses|Applicability):\*\*\s*/gi,
+                    "<br><strong>$1:</strong> "
+                );
+
+                // Clean up extra breaks before the first coupon
+                couponText = couponText.replace(
+                    /<\/h4>(?:\s*<br>)+/i,
+                    "</h4><br>"
+                );
+
+                return couponText;
+            }
+            // 5. Handle the existing Available Products / Handbags layout
             const hasAvailableProducts =
                 /Available Products/i.test(safe) ||
                 /Available Handbags/i.test(safe);
@@ -1312,7 +1343,7 @@
                  * Do not run another Markdown cleanup here.
                  */
 
-                const cleanAnswer = answer.trim();
+                const cleanAnswer = formatAIText(answer).trim();
 
                 /*
                  * Detect catalog/product-list responses.

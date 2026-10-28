@@ -109,6 +109,88 @@ class CartItem(models.Model):
     @property
     def subtotal(self): return (self.product.price or 0) * self.quantity
 
+    # ============================================================
+# COUPON / PROMOTION MODEL
+# ============================================================
+
+class Coupon(models.Model):
+
+    DISCOUNT_TYPES = [
+        ('percentage', 'Percentage Discount'),
+        ('fixed', 'Fixed Amount Discount'),
+        ('free_shipping', 'Free Shipping'),
+    ]
+
+    code = models.CharField(
+        max_length=50,
+        unique=True
+    )
+
+    discount_type = models.CharField(
+        max_length=20,
+        choices=DISCOUNT_TYPES,
+        default='percentage'
+    )
+
+    discount_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
+    minimum_order_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+
+    maximum_discount_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    valid_from = models.DateTimeField()
+
+    valid_until = models.DateTimeField()
+
+    usage_limit = models.PositiveIntegerField(
+        null=True,
+        blank=True
+    )
+
+    used_count = models.PositiveIntegerField(
+        default=0
+    )
+
+    first_order_only = models.BooleanField(
+        default=False
+    )
+
+    products = models.ManyToManyField(
+        Product,
+        blank=True,
+        related_name='coupons'
+    )
+
+    categories = models.ManyToManyField(
+        Category,
+        blank=True,
+        related_name='coupons'
+    )
+
+    active = models.BooleanField(
+        default=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return self.code
+
 class Order(models.Model):
 
     STATUS = [
@@ -146,6 +228,20 @@ class Order(models.Model):
     )
 
     total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+
+    coupon = models.ForeignKey(
+        'Coupon',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders'
+    )
+
+    coupon_discount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0

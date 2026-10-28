@@ -11,6 +11,7 @@ from .models import (
     Cart,
     CartItem,
     Order,
+    Coupon,
     OrderItem,
     OrderTracking,
     CompetitorProduct,
@@ -520,3 +521,16 @@ class ChatMessageAdmin(admin.ModelAdmin):
     search_fields = (
         "content",
     )
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = (
+        "code",
+        "discount_type",
+        "discount_value",
+        "active",
+        "valid_from",
+        "valid_until",
+    )
+    list_filter = ("discount_type", "active")
+    search_fields = ("code",)

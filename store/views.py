@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
 from django.utils import timezone
-
+from decimal import Decimal
 from .ai_services import analyze_product, chatbot_answer
 from .models import (
     Cart,
@@ -19,6 +19,7 @@ from .models import (
     ChatConversation,
     ChatMessage,
     Order,
+    Coupon,
     OrderItem,
     OrderTracking,
     Product,
@@ -895,6 +896,12 @@ def checkout(request):
             return redirect("cart")
 
     total = cart.total
+    coupon_code = request.session.get("coupon_code", "")
+    coupon_discount = Decimal(
+        request.session.get("coupon_discount", "0.00")
+    )
+    discounted_total = total - coupon_discount
+    applied_coupon = None
 
     if request.method == "POST":
 
@@ -932,6 +939,160 @@ def checkout(request):
             "payment_method",
             "cod"
         )
+
+        # -----------------------------------------
+        # COUPON VALIDATION AND DISCOUNT
+        # -----------------------------------------
+        coupon_code = request.POST.get(
+            "coupon_code",
+            ""
+        ).strip().upper()
+
+        if coupon_code:
+            from django.utils import timezone
+
+            try:
+                applied_coupon = Coupon.objects.get(
+                    code__iexact=coupon_code
+                )
+            except Coupon.DoesNotExist:
+                messages.error(
+                    request,
+                    "Invalid coupon code."
+                )
+                return redirect("checkout")
+
+            now = timezone.now()
+
+            if not applied_coupon.active:
+                messages.error(request, "This coupon is inactive.")
+                return redirect("checkout")
+
+            if not (
+                applied_coupon.valid_from <= now
+                <= applied_coupon.valid_until
+            ):
+                messages.error(
+                    request,
+                    "This coupon is expired or not yet valid."
+                )
+                return redirect("checkout")
+
+            if (
+                applied_coupon.usage_limit is not None
+                and applied_coupon.used_count
+                >= applied_coupon.usage_limit
+            ):
+                messages.error(
+                    request,
+                    "This coupon has reached its usage limit."
+                )
+                return redirect("checkout")
+
+            if total < applied_coupon.minimum_order_amount:
+                messages.error(
+                    request,
+                    "Your order does not meet the minimum amount "
+                    "for this coupon."
+                )
+                return redirect("checkout")
+
+            if (
+                applied_coupon.first_order_only
+                and Order.objects.filter(user=request.user).exists()
+            ):
+                messages.error(
+                    request,
+                    "This coupon is available for first orders only."
+                )
+                return redirect("checkout")
+
+            # Check product/category restrictions.
+            restricted_products = applied_coupon.products.exists()
+            restricted_categories = applied_coupon.categories.exists()
+
+            eligible_items = []
+
+            for item in items:
+                product_matches = (
+                    applied_coupon.products.filter(
+                        pk=item.product_id
+                    ).exists()
+                    if restricted_products
+                    else False
+                )
+
+                category_matches = (
+                    applied_coupon.categories.filter(
+                        pk=item.product.category_id
+                    ).exists()
+                    if restricted_categories
+                    and item.product.category_id
+                    else False
+                )
+
+                if not (
+                    restricted_products or restricted_categories
+                ) or product_matches or category_matches:
+                    eligible_items.append(item)
+
+            if not eligible_items:
+                messages.error(
+                    request,
+                    "This coupon does not apply to your cart products."
+                )
+                return redirect("checkout")
+
+            eligible_total = sum(
+                (
+                    (item.product.price or Decimal("0.00"))
+                    * item.quantity
+                    for item in eligible_items
+                ),
+                Decimal("0.00")
+            )
+
+            if applied_coupon.discount_type == "percentage":
+                coupon_discount = (
+                    eligible_total
+                    * applied_coupon.discount_value
+                    / Decimal("100")
+                )
+
+                if applied_coupon.maximum_discount_amount is not None:
+                    coupon_discount = min(
+                        coupon_discount,
+                        applied_coupon.maximum_discount_amount
+                    )
+
+            elif applied_coupon.discount_type == "fixed":
+                coupon_discount = min(
+                    applied_coupon.discount_value,
+                    eligible_total
+                )
+
+            elif applied_coupon.discount_type == "free_shipping":
+                coupon_discount = Decimal("0.00")
+
+            coupon_discount = min(
+                coupon_discount,
+                total
+            ).quantize(Decimal("0.01"))
+
+            discounted_total = total - coupon_discount
+
+            # Save coupon details and return to checkout
+            if request.POST.get("action") == "apply_coupon":
+                request.session["coupon_code"] = coupon_code
+                request.session["coupon_discount"] = str(coupon_discount)
+
+                messages.success(
+                    request,
+                    f"Coupon {coupon_code} applied successfully!"
+                )
+
+                return redirect("checkout")
+
 
         if not full_name:
 
@@ -984,7 +1145,7 @@ def checkout(request):
 
         order = Order.objects.create(
             user=request.user,
-            total=total,
+            total=discounted_total,
             status="pending",
             payment_method=payment_method,
             payment_status=payment_status,
@@ -1028,6 +1189,10 @@ def checkout(request):
             location=city
         )
 
+        if applied_coupon:
+            applied_coupon.used_count += 1
+            applied_coupon.save(update_fields=["used_count"])
+
         cart.items.all().delete()
 
         messages.success(
@@ -1044,6 +1209,9 @@ def checkout(request):
         "cart": cart,
         "items": items,
         "total": total,
+        "coupon_discount": coupon_discount,
+        "discounted_total": discounted_total,
+        "coupon_code": coupon_code,
     }
 
     return render(
@@ -1136,6 +1304,137 @@ def chatbot_api(request):
         " ",
         clean_question
     ).strip()
+
+    # ============================================================
+    # COUPON INFORMATION FOR AI CHATBOT
+    # ============================================================
+
+    coupon_question_words = [
+        "coupon",
+        "coupons",
+        "promo code",
+        "promo codes",
+        "discount code",
+        "discount codes",
+        "coupon code",
+        "coupon codes",
+    ]
+
+    is_coupon_question = any(
+        phrase in clean_question
+        for phrase in coupon_question_words
+    )
+
+    if is_coupon_question:
+
+        now = timezone.now()
+
+        active_coupons = (
+            Coupon.objects
+            .filter(
+                active=True,
+                valid_from__lte=now,
+                valid_until__gte=now,
+            )
+            .prefetch_related(
+                "products",
+                "categories",
+            )
+            .order_by("valid_until")
+        )
+
+        if not active_coupons.exists():
+
+            coupon_answer = (
+                "🎟️ **Available Coupons**\n\n"
+                "There are currently no active coupons "
+                "available. Please check again later."
+            )
+
+        else:
+
+            coupon_lines = [
+                "🎟️ **Available Coupons**\n"
+            ]
+
+            for coupon in active_coupons:
+
+                if coupon.discount_type == "percentage":
+                    discount_text = (
+                        f"{coupon.discount_value}% off"
+                    )
+
+                elif coupon.discount_type == "fixed":
+                    discount_text = (
+                        f"₹{coupon.discount_value} off"
+                    )
+
+                elif coupon.discount_type == "free_shipping":
+                    discount_text = "Free shipping"
+
+                else:
+                    discount_text = "Special discount"
+
+                coupon_lines.append(
+                    f"**Code:** {coupon.code}\n"
+                    f"**Offer:** {discount_text}\n"
+                    f"**Minimum order:** "
+                    f"₹{coupon.minimum_order_amount}\n"
+                )
+
+                if (
+                    coupon.discount_type == "percentage"
+                    and coupon.maximum_discount_amount is not None
+                ):
+                    coupon_lines.append(
+                        f"**Maximum discount:** "
+                        f"₹{coupon.maximum_discount_amount}\n"
+                    )
+
+                coupon_lines.append(
+                    f"**Valid until:** "
+                    f"{timezone.localtime(coupon.valid_until).strftime('%d %b %Y')}\n"
+                )
+
+                if coupon.first_order_only:
+                    coupon_lines.append(
+                        "**Restriction:** First order only\n"
+                    )
+
+                if coupon.usage_limit is not None:
+                    remaining_uses = max(
+                        0,
+                        coupon.usage_limit - coupon.used_count
+                    )
+
+                    coupon_lines.append(
+                        f"**Remaining uses:** {remaining_uses}\n"
+                    )
+
+                if (
+                    coupon.products.exists()
+                    or coupon.categories.exists()
+                ):
+                    coupon_lines.append(
+                        "**Restriction:** Applies only to "
+                        "eligible products or categories\n"
+                    )
+                else:
+                    coupon_lines.append(
+                        "**Applicability:** General coupon\n"
+                    )
+
+                coupon_lines.append("")
+
+            coupon_answer = "\n".join(coupon_lines)
+
+        return JsonResponse({
+            "success": True,
+            "type": "coupon_information",
+            "answer": coupon_answer,
+            "products": [],
+        })
+
 
     # ============================================================
     # 2. LOAD PRODUCTS
